@@ -22,7 +22,7 @@ public final class IslandWindowController: NSObject, ObservableObject {
     public func showIsland(with rootView: AnyView) {
         let geometry = ScreenNotchDetector.detect()
         let maxPanelWidth: CGFloat = 520
-        let maxPanelHeight: CGFloat = 260
+        let maxPanelHeight: CGFloat = 340
 
         let screenFrame = geometry.screenFrame
         let originX = screenFrame.midX - (maxPanelWidth / 2.0)
@@ -49,7 +49,7 @@ public final class IslandWindowController: NSObject, ObservableObject {
         guard let panel = panel else { return }
         let geometry = ScreenNotchDetector.detect()
         let maxPanelWidth: CGFloat = 520
-        let maxPanelHeight: CGFloat = 260
+        let maxPanelHeight: CGFloat = 340
 
         let screenFrame = geometry.screenFrame
         let originX = screenFrame.midX - (maxPanelWidth / 2.0)
@@ -76,12 +76,21 @@ public final class IslandWindowController: NSObject, ObservableObject {
 /// Custom hosting view that allows mouse events to pass through transparent regions outside the visible island
 final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
     override func hitTest(_ point: NSPoint) -> NSView? {
-        let view = super.hitTest(point)
-        // If clicking on root background, return nil so clicks pass through to apps underneath
-        if view == self {
-            return nil
+        let currentWidth = IslandCoordinator.shared.currentIslandWidth
+        let currentHeight = IslandCoordinator.shared.currentIslandHeight
+
+        let minX = (bounds.width - currentWidth) / 2.0
+        let minY = bounds.height - currentHeight
+
+        let islandRect = NSRect(x: minX, y: minY, width: currentWidth, height: currentHeight)
+
+        // If clicking inside the visible island capsule, return self so clicks reach SwiftUI buttons!
+        if islandRect.contains(point) {
+            return super.hitTest(point)
         }
-        return view
+
+        // If clicking on empty background margins outside the island, pass clicks through to apps underneath
+        return nil
     }
 }
 

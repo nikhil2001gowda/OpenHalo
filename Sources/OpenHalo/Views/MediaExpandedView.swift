@@ -10,6 +10,11 @@ public struct MediaExpandedView: View {
         self.systemControls = systemControls
     }
 
+    private var isTrackActive: Bool {
+        !mediaService.currentTrack.title.isEmpty &&
+        mediaService.currentTrack.title != "Unknown Title"
+    }
+
     public var body: some View {
         VStack(spacing: 10) {
             // Track Info & Artwork
@@ -31,12 +36,12 @@ public struct MediaExpandedView: View {
 
                 // Title & Artist
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(mediaService.currentTrack.title.isEmpty ? "No Media Playing" : mediaService.currentTrack.title)
+                    Text(isTrackActive ? mediaService.currentTrack.title : "No Media Playing")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
 
-                    if mediaService.currentTrack.title.isEmpty {
+                    if !isTrackActive {
                         Text("Auto-detects any media app when playing")
                             .font(.system(size: 10, weight: .regular))
                             .foregroundColor(Color.white.opacity(0.6))
@@ -85,7 +90,7 @@ public struct MediaExpandedView: View {
                         }
                         .padding(.top, 2)
                     } else {
-                        Text(mediaService.currentTrack.artist)
+                        Text(mediaService.currentTrack.artist.isEmpty || mediaService.currentTrack.artist == "Unknown Artist" ? "Apple Music" : mediaService.currentTrack.artist)
                             .font(.system(size: 11, weight: .regular))
                             .foregroundColor(Color.white.opacity(0.65))
                             .lineLimit(1)

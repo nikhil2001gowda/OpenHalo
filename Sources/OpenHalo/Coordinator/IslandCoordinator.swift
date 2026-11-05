@@ -61,6 +61,36 @@ public final class IslandCoordinator: ObservableObject {
     public let launchAtLogin = LaunchAtLoginService.shared
     public let screenLockFaceService = ScreenLockFaceService.shared
 
+    // MARK: - Dynamic Capsule Dimensions
+
+    public var currentIslandWidth: CGFloat {
+        if isDropHovered { return 460 }
+        if state.isExpanded { return 430 }
+        if case .hud = state { return 230 }
+        return 204
+    }
+
+    public var currentIslandHeight: CGFloat {
+        if isDropHovered { return 120 }
+        let notchOffset: CGFloat = ScreenNotchDetector.detect().hasNotch ? 36 : 0
+        if state.isExpanded {
+            switch activeTab {
+            case .mirror: return 215 + notchOffset
+            case .calendar: return 190 + notchOffset
+            case .media: return 175 + notchOffset
+            case .timers: return 165 + notchOffset
+            case .system: return 175 + notchOffset
+            case .shelf: return 140 + notchOffset
+            case .clipboard: return 165 + notchOffset
+            case .launcher: return 145 + notchOffset
+            case .focus: return 150 + notchOffset
+            case .weather: return 145 + notchOffset
+            }
+        }
+        if case .hud = state { return 36 }
+        return 34
+    }
+
     private var autoCollapseWorkItem: DispatchWorkItem?
     private var hudDismissWorkItem: DispatchWorkItem?
     private var cancellables = Set<AnyCancellable>()

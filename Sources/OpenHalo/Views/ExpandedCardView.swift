@@ -36,7 +36,7 @@ public struct ExpandedCardView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
-            .padding(.top, 9)
+            .padding(.top, ScreenNotchDetector.detect().hasNotch ? 36 : 9)
             .padding(.bottom, 4)
 
             Divider()

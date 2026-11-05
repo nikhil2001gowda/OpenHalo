@@ -10,17 +10,17 @@ public struct IslandRootView: View {
     public var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .top) {
-                // Background Capsule
+                // Background Capsule (100% Solid Black, Zero Bleed-Through)
                 RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
-                    .fill(Color.black.opacity(0.96))
+                    .fill(Color(red: 0.05, green: 0.05, blue: 0.06))
                     .overlay(
                         RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
                             .strokeBorder(
-                                isDropTargeted ? Color.cyan : Color.white.opacity(0.12),
-                                lineWidth: isDropTargeted ? 1.5 : 0.5
+                                isDropTargeted ? Color.cyan : Color.white.opacity(0.15),
+                                lineWidth: isDropTargeted ? 1.5 : 0.8
                             )
                     )
-                    .shadow(color: Color.black.opacity(0.45), radius: 14, x: 0, y: 7)
+                    .shadow(color: Color.black.opacity(0.6), radius: 16, x: 0, y: 8)
 
                 // Foreground Content
                 VStack(spacing: 0) {
@@ -58,40 +58,11 @@ public struct IslandRootView: View {
     }
 
     private var currentWidth: CGFloat {
-        if isDropTargeted {
-            return 460
-        }
-        if coordinator.state.isExpanded {
-            return 430
-        }
-        if case .hud = coordinator.state {
-            return 230
-        }
-        return 204
+        coordinator.currentIslandWidth
     }
 
     private var currentHeight: CGFloat {
-        if isDropTargeted {
-            return 120
-        }
-        if coordinator.state.isExpanded {
-            switch coordinator.activeTab {
-            case .mirror: return 215
-            case .calendar: return 190
-            case .media: return 175
-            case .timers: return 165
-            case .system: return 175
-            case .shelf: return 140
-            case .clipboard: return 165
-            case .launcher: return 145
-            case .focus: return 150
-            case .weather: return 145
-            }
-        }
-        if case .hud = coordinator.state {
-            return 36
-        }
-        return 34
+        coordinator.currentIslandHeight
     }
 
     private var currentCornerRadius: CGFloat {
