@@ -8,6 +8,8 @@ public struct SettingsView: View {
     @ObservedObject var powerCoordinator = PowerSuspensionCoordinator.shared
     @ObservedObject var weatherService = WeatherService.shared
 
+    @State private var isShowingEnrollmentSheet: Bool = false
+
     public init() {}
 
     public var body: some View {
@@ -94,9 +96,9 @@ public struct SettingsView: View {
 
                     HStack(spacing: 10) {
                         Button(faceService.hasEnrolledFace ? "Re-Enroll Face Profile" : "Enroll Face Profile") {
-                            faceService.enrollCurrentFace()
+                            isShowingEnrollmentSheet = true
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.borderedProminent)
                         .controlSize(.small)
 
                         if faceService.hasEnrolledFace {
@@ -110,6 +112,11 @@ public struct SettingsView: View {
                                 .font(.system(size: 10))
                                 .foregroundColor(.green)
                         }
+                    }
+                }
+                .sheet(isPresented: $isShowingEnrollmentSheet) {
+                    FaceIDEnrollmentView(faceService: faceService) {
+                        isShowingEnrollmentSheet = false
                     }
                 }
 

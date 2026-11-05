@@ -26,8 +26,17 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
     @Published public var lastRecognitionTimestamp: Date? = nil
     @Published public var statusMessage: String = "Idle"
 
+    // Interactive Enrollment Properties
+    @Published public var isEnrolling: Bool = false
+    @Published public var enrollmentProgress: Double = 0.0
+    @Published public var enrollmentGuidance: String = "Position your face within the frame"
+    @Published public var isEnrollmentComplete: Bool = false
+    @Published public var detectedFaceInFrame: Bool = false
+    @Published public var activeSession: AVCaptureSession? = nil
+
     private let enrollmentKey = "OpenHalo.FaceID.EnrolledSignature"
     private var enrolledRatios: [Float] = []
+    private var collectedEnrollmentRatios: [[Float]] = []
 
     // AVCapture properties
     private var captureSession: AVCaptureSession?
@@ -165,6 +174,7 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
 
             Task { @MainActor [weak self] in
                 self?.captureSession = session
+                self?.activeSession = session
             }
         } catch {
             Task { @MainActor [weak self] in
@@ -182,6 +192,7 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
 
         let session = captureSession
         captureSession = nil
+        activeSession = nil
 
         sessionQueue.async {
             session?.stopRunning()
@@ -216,9 +227,16 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
 
             // Extract geometric ratios
             let ratios = self.extractGeometricRatios(from: face)
+            let yawVal = face.yaw?.doubleValue ?? 0.0
+            let pitchVal = face.pitch?.doubleValue ?? 0.0
 
             Task { @MainActor [weak self] in
-                self?.evaluateFrame(ratios: ratios, quality: qualityScore)
+                guard let self = self else { return }
+                if self.isEnrolling {
+                    self.processEnrollmentFrame(ratios: ratios, quality: qualityScore, yaw: yawVal, pitch: pitchVal)
+                } else {
+                    self.evaluateFrame(ratios: ratios, quality: qualityScore)
+                }
             }
         } catch {
             // Silently continue until 5s timeout
@@ -290,32 +308,103 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         return sumDiff / Float(count)
     }
 
-    // MARK: - Face Profile Enrollment (Local Only, Zero Image Storage)
+    // MARK: - Interactive iPhone-Style Face ID Enrollment
 
-    public func enrollCurrentFace() {
-        guard captureSession == nil else { return }
-        self.statusMessage = "Enrolling Face Profile..."
-
-        // Take a 1.5s capture to register biometric ratios
-        self.state = .scanning(remainingSeconds: 1.5)
+    public func startInteractiveEnrollment() {
+        self.isEnrolling = true
+        self.isEnrollmentComplete = false
+        self.enrollmentProgress = 0.0
+        self.enrollmentGuidance = "Position your face in the center"
+        self.collectedEnrollmentRatios = []
+        self.detectedFaceInFrame = false
 
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
             self.configureAndStartCapture()
         }
+    }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            guard let self = self else { return }
-            self.stopAndCleanup()
-            if self.enrolledRatios.isEmpty {
-                // If camera had no face in 1.5s, save default normalized anchor
-                self.enrolledRatios = [0.75, 0.32, 0.45]
-                UserDefaults.standard.set(self.enrolledRatios, forKey: self.enrollmentKey)
-                self.hasEnrolledFace = true
-                self.statusMessage = "Face Profile Enrolled (Local)"
-                self.state = .idle
+    public func stopInteractiveEnrollment() {
+        self.isEnrolling = false
+        self.stopAndCleanup()
+    }
+
+    @MainActor
+    public func processEnrollmentFrame(ratios: [Float], quality: Float, yaw: Double, pitch: Double) {
+        guard isEnrolling && !isEnrollmentComplete else { return }
+        self.detectedFaceInFrame = true
+        self.collectedEnrollmentRatios.append(ratios)
+
+        // Track 3D head rotation around the Face ID circle
+        let current = enrollmentProgress
+
+        if current < 0.3 {
+            // Step 1: Center
+            self.enrollmentGuidance = "Look directly at the camera"
+            if abs(yaw) < 0.25 {
+                enrollmentProgress = min(0.3, current + 0.04)
+            }
+        } else if current < 0.55 {
+            // Step 2: Turn Left
+            self.enrollmentGuidance = "Slowly turn your head to the left"
+            if yaw < -0.15 {
+                enrollmentProgress = min(0.55, current + 0.04)
+            } else {
+                enrollmentProgress = min(0.55, current + 0.015)
+            }
+        } else if current < 0.8 {
+            // Step 3: Turn Right
+            self.enrollmentGuidance = "Slowly turn your head to the right"
+            if yaw > 0.15 {
+                enrollmentProgress = min(0.8, current + 0.04)
+            } else {
+                enrollmentProgress = min(0.8, current + 0.015)
+            }
+        } else if current < 1.0 {
+            // Step 4: Tilt slightly
+            self.enrollmentGuidance = "Tilt your head slightly up and down"
+            if abs(pitch) > 0.08 {
+                enrollmentProgress = min(1.0, current + 0.05)
+            } else {
+                enrollmentProgress = min(1.0, current + 0.02)
             }
         }
+
+        if enrollmentProgress >= 1.0 {
+            finishEnrollment()
+        }
+    }
+
+    @MainActor
+    private func finishEnrollment() {
+        self.isEnrollmentComplete = true
+        self.enrollmentGuidance = "Face ID is Ready!"
+        self.stopAndCleanup()
+
+        // Compute averaged high-precision signature from captured angles
+        if !collectedEnrollmentRatios.isEmpty {
+            let numFeatures = collectedEnrollmentRatios[0].count
+            var averaged: [Float] = Array(repeating: 0.0, count: numFeatures)
+            for sample in collectedEnrollmentRatios {
+                for i in 0..<min(numFeatures, sample.count) {
+                    averaged[i] += sample[i]
+                }
+            }
+            let count = Float(collectedEnrollmentRatios.count)
+            self.enrolledRatios = averaged.map { $0 / count }
+        } else {
+            self.enrolledRatios = [0.75, 0.32, 0.45]
+        }
+
+        UserDefaults.standard.set(self.enrolledRatios, forKey: self.enrollmentKey)
+        self.hasEnrolledFace = true
+        self.statusMessage = "Face Profile Enrolled (Local Key)"
+
+        SoundEffectManager.playActionBeep()
+    }
+
+    public func enrollCurrentFace() {
+        startInteractiveEnrollment()
     }
 
     private func loadEnrolledFace() {
