@@ -41,3 +41,4 @@ public final class LaunchAtLoginService: ObservableObject {
         SMAppService.openSystemSettingsLoginItems()
     }
 }
+

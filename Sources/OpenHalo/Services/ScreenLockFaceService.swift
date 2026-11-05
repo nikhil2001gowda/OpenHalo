@@ -211,11 +211,7 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
             }
 
             // Quality filter (anti-blur / glare)
-            var qualityScore: Float = 0.5
-            if let qualityResult = qualityRequest.results?.first {
-                qualityScore = qualityResult.faceCaptureQuality ?? 0.5
-            }
-
+            let qualityScore: Float = qualityRequest.results?.first?.faceCaptureQuality ?? 0.5
             guard qualityScore >= 0.35 else { return }
 
             // Extract geometric ratios

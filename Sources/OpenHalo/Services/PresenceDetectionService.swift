@@ -1,6 +1,6 @@
 import Foundation
 @preconcurrency import AVFoundation
-@preconcurrency import Vision
+import Vision
 import AppKit
 
 @MainActor
