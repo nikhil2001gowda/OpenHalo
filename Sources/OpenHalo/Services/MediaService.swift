@@ -93,7 +93,8 @@ public final class MediaService: ObservableObject {
 
     public func startPolling() {
         pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
+        // Fast 1.2s polling so YouTube / browser media Live Activity reacts immediately
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.2, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.checkActivePlayers()
             }
@@ -334,49 +335,51 @@ public final class MediaService: ObservableObject {
                 }
             }
 
-            // 3. Check Google Chrome (YouTube, Spotify Web, SoundCloud, Twitch, etc.)
-            if Self.isAppRunning(bundleID: "com.google.Chrome") {
-                let script = """
-                tell application "Google Chrome"
-                    repeat with w in windows
-                        repeat with t in tabs of w
-                            set u to URL of t
-                            if u contains "youtube.com/watch" or u contains "music.youtube.com" or u contains "soundcloud.com" or u contains "spotify.com" or u contains "twitch.tv" or u contains "netflix.com" or u contains "hotstar.com" or u contains "primevideo.com" then
-                                return (title of t) & "|||" & u & "|||Chrome"
-                            end if
+            // 3. Check Web Browsers (Chrome, Brave, Arc, Edge, Safari) for YouTube, Spotify Web, etc.
+            let browserConfigs: [(bundleID: String, appName: String)] = [
+                ("com.google.Chrome", "Google Chrome"),
+                ("com.brave.Browser", "Brave Browser"),
+                ("company.thebrowser.Arc", "Arc"),
+                ("com.microsoft.edgemac", "Microsoft Edge"),
+                ("com.apple.Safari", "Safari")
+            ]
+
+            for config in browserConfigs {
+                if Self.isAppRunning(bundleID: config.bundleID) {
+                    let script = config.appName == "Safari" ? """
+                    tell application "Safari"
+                        repeat with w in windows
+                            repeat with t in tabs of w
+                                set u to URL of t
+                                if u contains "youtube.com/watch" or u contains "music.youtube.com" or u contains "soundcloud.com" or u contains "spotify.com" or u contains "twitch.tv" or u contains "netflix.com" then
+                                    return (name of t) & "|||" & u & "|||\(config.appName)"
+                                end if
+                            end repeat
                         end repeat
-                    end repeat
-                end tell
-                return "none"
-                """
-                if let output = await AppleScriptRunner.run(script), output != "none" {
-                    await self.parseBrowserMedia(output: output, browserName: "Google Chrome", isAudible: isSystemAudioActive)
-                    return
+                    end tell
+                    return "none"
+                    """ : """
+                    tell application "\(config.appName)"
+                        repeat with w in windows
+                            repeat with t in tabs of w
+                                set u to URL of t
+                                if u contains "youtube.com/watch" or u contains "music.youtube.com" or u contains "soundcloud.com" or u contains "spotify.com" or u contains "twitch.tv" or u contains "netflix.com" or u contains "hotstar.com" or u contains "primevideo.com" then
+                                    return (title of t) & "|||" & u & "|||\(config.appName)"
+                                end if
+                            end repeat
+                        end repeat
+                    end tell
+                    return "none"
+                    """
+
+                    if let output = await AppleScriptRunner.run(script), output != "none" {
+                        await self.parseBrowserMedia(output: output, browserName: config.appName, isAudible: true)
+                        return
+                    }
                 }
             }
 
-            // 4. Check Safari
-            if Self.isAppRunning(bundleID: "com.apple.Safari") {
-                let script = """
-                tell application "Safari"
-                    repeat with w in windows
-                        repeat with t in tabs of w
-                            set u to URL of t
-                            if u contains "youtube.com/watch" or u contains "music.youtube.com" or u contains "soundcloud.com" or u contains "spotify.com" or u contains "twitch.tv" or u contains "netflix.com" then
-                                return (name of t) & "|||" & u & "|||Safari"
-                            end if
-                        end repeat
-                    end repeat
-                end tell
-                return "none"
-                """
-                if let output = await AppleScriptRunner.run(script), output != "none" {
-                    await self.parseBrowserMedia(output: output, browserName: "Safari", isAudible: isSystemAudioActive)
-                    return
-                }
-            }
-
-            // 5. Check QuickTime Player
+            // 4. Check QuickTime Player
             if Self.isAppRunning(bundleID: "com.apple.QuickTimePlayerX") {
                 let script = """
                 tell application "QuickTime Player"
@@ -394,25 +397,17 @@ public final class MediaService: ObservableObject {
                 }
             }
 
-            // 6. Generic Audio Check: Is system outputting audio?
-            if isSystemAudioActive {
-                await MainActor.run {
-                    if !self.currentTrack.title.isEmpty && self.currentTrack.title != "No Media Playing" {
-                        self.currentTrack.playbackState = .playing
-                        self.isAvailable = true
-                    }
-                }
-            } else {
-                // Audio has stopped & no player has an active track
-                await MainActor.run {
-                    if self.currentTrack.source != .appleMusic && self.currentTrack.source != .spotify {
+            // 5. If no active media stream was detected in any player/browser, clear media state so Island returns to notch width
+            await MainActor.run {
+                if self.currentTrack.source != .appleMusic && self.currentTrack.source != .spotify {
+                    if !self.currentTrack.title.isEmpty {
                         self.currentTrack = MediaTrack()
                         self.isAvailable = false
                         self.updateProgressTimer()
-                    } else if self.currentTrack.playbackState == .playing {
-                        self.currentTrack.playbackState = .paused
-                        self.updateProgressTimer()
                     }
+                } else if self.currentTrack.playbackState == .playing && !isSystemAudioActive {
+                    self.currentTrack.playbackState = .paused
+                    self.updateProgressTimer()
                 }
             }
         }
@@ -422,7 +417,7 @@ public final class MediaService: ObservableObject {
         let parts = output.components(separatedBy: "|||")
         guard parts.count >= 2 else { return }
 
-        var rawTitle = parts[0]
+        var rawTitle = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
         let url = parts[1]
 
         var source: MusicSource = .webMedia
@@ -430,7 +425,7 @@ public final class MediaService: ObservableObject {
 
         if url.contains("youtube.com") || url.contains("youtu.be") {
             source = .youtube
-            artist = "YouTube • \(browserName)"
+            artist = "YouTube"
             // Clean title by removing standard " - YouTube" suffix
             if rawTitle.hasSuffix(" - YouTube") {
                 rawTitle = String(rawTitle.dropLast(" - YouTube".count))
@@ -457,10 +452,10 @@ public final class MediaService: ObservableObject {
             album: "",
             duration: 0,
             position: 0,
-            playbackState: isAudible ? .playing : .paused,
+            playbackState: .playing,
             source: source
         )
-        self.isAvailable = isAudible
+        self.isAvailable = true
         self.updateProgressTimer()
     }
 

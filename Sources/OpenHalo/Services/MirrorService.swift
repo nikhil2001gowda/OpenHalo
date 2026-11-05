@@ -10,40 +10,11 @@ public final class MirrorService: ObservableObject {
     @Published public var availableCameras: [AVCaptureDevice] = []
     @Published public var selectedCameraID: String? = nil
 
-    // macOS Camera Video Effects (Center Stage, Studio Light, Portrait)
-    @Published public var isCenterStageActive: Bool = false
-    @Published public var isStudioLightActive: Bool = false
-    @Published public var isPortraitActive: Bool = false
+    private let sessionQueue = DispatchQueue(label: "com.openhalo.mirror.sessionQueue", qos: .userInitiated)
 
     public init() {
         checkPermission()
         discoverCameras()
-        updateVideoEffectsStatus()
-    }
-
-    public func updateVideoEffectsStatus() {
-        if #available(macOS 12.3, *) {
-            self.isCenterStageActive = AVCaptureDevice.isCenterStageEnabled
-        }
-        if #available(macOS 13.0, *) {
-            self.isStudioLightActive = AVCaptureDevice.isStudioLightEnabled
-        }
-        if #available(macOS 12.0, *) {
-            self.isPortraitActive = AVCaptureDevice.isPortraitEffectEnabled
-        }
-    }
-
-    public func toggleCenterStage() {
-        if #available(macOS 12.3, *) {
-            AVCaptureDevice.isCenterStageEnabled.toggle()
-            updateVideoEffectsStatus()
-        }
-    }
-
-    public func openSystemVideoEffects() {
-        if #available(macOS 12.0, *) {
-            AVCaptureDevice.showSystemUserInterface(.videoEffects)
-        }
     }
 
     public func checkPermission() {
@@ -63,18 +34,18 @@ public final class MirrorService: ObservableObject {
                 self?.hasPermission = granted
                 if granted {
                     self?.discoverCameras()
-                    self?.setupSession()
+                    self?.startSession()
                 }
             }
         }
     }
 
     public func discoverCameras() {
-        var types: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera]
+        let types: [AVCaptureDevice.DeviceType]
         if #available(macOS 14.0, *) {
-            types.append(contentsOf: [.external, .continuityCamera])
+            types = [.builtInWideAngleCamera, .external]
         } else {
-            types.append(.external)
+            types = [.builtInWideAngleCamera]
         }
         let discovery = AVCaptureDevice.DiscoverySession(
             deviceTypes: types,
@@ -95,32 +66,39 @@ public final class MirrorService: ObservableObject {
         }
 
         setupSession()
-        updateVideoEffectsStatus()
         let captureSession = self.session
         guard !captureSession.isRunning else {
             self.isRunning = true
             return
         }
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        sessionQueue.async { [weak self] in
             captureSession.startRunning()
             Task { @MainActor [weak self] in
                 self?.isRunning = captureSession.isRunning
-                self?.updateVideoEffectsStatus()
             }
         }
     }
 
     public func stopSession() {
-        guard isRunning else { return }
         let captureSession = self.session
+        guard captureSession.isRunning else {
+            self.isRunning = false
+            return
+        }
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        sessionQueue.async { [weak self] in
             captureSession.stopRunning()
             Task { @MainActor [weak self] in
                 self?.isRunning = false
             }
         }
+    }
+
+    public func switchCamera(to uniqueID: String) {
+        selectedCameraID = uniqueID
+        stopSession()
+        startSession()
     }
 
     private func setupSession() {
