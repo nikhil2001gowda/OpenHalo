@@ -36,16 +36,59 @@ public struct MediaExpandedView: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
 
-                    Text(mediaService.currentTrack.artist.isEmpty ? "Launch Apple Music or Spotify" : mediaService.currentTrack.artist)
-                        .font(.system(size: 11, weight: .regular))
-                        .foregroundColor(Color.white.opacity(0.65))
-                        .lineLimit(1)
+                    if mediaService.currentTrack.title.isEmpty {
+                        HStack(spacing: 6) {
+                            Button(action: {
+                                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Music.app"))
+                            }) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "apple.logo")
+                                        .font(.system(size: 9))
+                                    Text("Music")
+                                        .font(.system(size: 9, weight: .semibold))
+                                }
+                                .foregroundColor(.pink)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.pink.opacity(0.2))
+                                .cornerRadius(5)
+                            }
+                            .buttonStyle(.plain)
 
-                    if !mediaService.currentTrack.album.isEmpty {
-                        Text(mediaService.currentTrack.album)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(Color.white.opacity(0.4))
+                            Button(action: {
+                                if let spotifyURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.spotify.client") {
+                                    NSWorkspace.shared.open(spotifyURL)
+                                } else {
+                                    NSWorkspace.shared.open(URL(string: "https://open.spotify.com")!)
+                                }
+                            }) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "music.note")
+                                        .font(.system(size: 9))
+                                    Text("Spotify")
+                                        .font(.system(size: 9, weight: .semibold))
+                                }
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.green.opacity(0.2))
+                                .cornerRadius(5)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.top, 2)
+                    } else {
+                        Text(mediaService.currentTrack.artist)
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundColor(Color.white.opacity(0.65))
                             .lineLimit(1)
+
+                        if !mediaService.currentTrack.album.isEmpty {
+                            Text(mediaService.currentTrack.album)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(Color.white.opacity(0.4))
+                                .lineLimit(1)
+                        }
                     }
                 }
 

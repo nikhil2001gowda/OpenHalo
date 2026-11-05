@@ -183,21 +183,18 @@ OpenHalo is engineered from the ground up to respect user privacy and adhere str
 - Xcode 16.0+ or Apple Command Line Tools
 - Swift 6.0 toolchain
 
-### Build & Run
+### Build & Install with 1 Command (App & DMG)
 ```bash
 # Clone the repository
 git clone https://github.com/nikhil2001gowda/OpenHalo.git
 cd OpenHalo
 
-# Run the automated 15-test verification suite
-swift run OpenHaloVerify
-
-# Build the standalone macOS release application bundle
-./scripts/build_app.sh
-
-# Launch OpenHalo
-open build/OpenHalo.app
+# Build release, package OpenHalo.dmg, and install directly to /Applications
+./scripts/build_dmg_and_install.sh
 ```
+
+- **Installed App**: `/Applications/OpenHalo.app`
+- **Distribution DMG**: `build/OpenHalo.dmg` (mount and drag-to-install)
 
 ---
 
