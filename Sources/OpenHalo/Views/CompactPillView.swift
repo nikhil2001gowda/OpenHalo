@@ -84,9 +84,13 @@ public struct CompactPillView: View {
         } else if !coordinator.fileShelfService.items.isEmpty {
             shelfLeading
         } else {
-            Circle()
-                .fill(Color.white.opacity(0.35))
-                .frame(width: 6, height: 6)
+            if ScreenNotchDetector.detect().hasNotch {
+                EmptyView()
+            } else {
+                Circle()
+                    .fill(Color.white.opacity(0.35))
+                    .frame(width: 6, height: 6)
+            }
         }
     }
 
@@ -158,9 +162,13 @@ public struct CompactPillView: View {
                 .font(.system(size: 10, weight: .bold))
                 .foregroundColor(.yellow)
         } else {
-            Circle()
-                .fill(Color.white.opacity(0.35))
-                .frame(width: 6, height: 6)
+            if ScreenNotchDetector.detect().hasNotch {
+                EmptyView()
+            } else {
+                Circle()
+                    .fill(Color.white.opacity(0.35))
+                    .frame(width: 6, height: 6)
+            }
         }
     }
 

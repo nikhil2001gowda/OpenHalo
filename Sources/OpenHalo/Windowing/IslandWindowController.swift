@@ -36,7 +36,7 @@ public final class IslandWindowController: NSObject, ObservableObject {
     public func showIsland(with rootView: AnyView) {
         let geometry = ScreenNotchDetector.detect()
         let maxPanelWidth: CGFloat = 520
-        let maxPanelHeight: CGFloat = 340
+        let maxPanelHeight: CGFloat = 350
 
         let screenFrame = geometry.screenFrame
         let originX = screenFrame.midX - (maxPanelWidth / 2.0)
@@ -61,30 +61,18 @@ public final class IslandWindowController: NSObject, ObservableObject {
 
     public func reposition() {
         guard let panel = panel else { return }
-        let isExpanded = IslandCoordinator.shared.state.isExpanded
-        updateFrameForState(isExpanded: isExpanded)
-    }
-
-    public func updateFrameForState(isExpanded: Bool) {
-        guard let panel = panel else { return }
         let geometry = ScreenNotchDetector.detect()
+        let maxPanelWidth: CGFloat = 520
+        let maxPanelHeight: CGFloat = 350
         let screenFrame = geometry.screenFrame
+        let originX = screenFrame.midX - (maxPanelWidth / 2.0)
+        let originY = screenFrame.maxY - maxPanelHeight
 
-        if isExpanded {
-            // Full screen transparent canvas to capture clicks outside anywhere on the display
-            panel.setFrame(screenFrame, display: true, animate: false)
-        } else {
-            let maxPanelWidth: CGFloat = 520
-            let maxPanelHeight: CGFloat = 340
-            let originX = screenFrame.midX - (maxPanelWidth / 2.0)
-            let originY = screenFrame.maxY - maxPanelHeight
-
-            panel.setFrame(
-                NSRect(x: originX, y: originY, width: maxPanelWidth, height: maxPanelHeight),
-                display: true,
-                animate: false
-            )
-        }
+        panel.setFrame(
+            NSRect(x: originX, y: originY, width: maxPanelWidth, height: maxPanelHeight),
+            display: true,
+            animate: false
+        )
     }
 
     private func setupScreenChangeObserver() {

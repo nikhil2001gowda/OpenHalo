@@ -73,33 +73,43 @@ public final class IslandCoordinator: ObservableObject {
 
     public var currentIslandWidth: CGFloat {
         if isDropHovered { return 460 }
-        if state.isExpanded { return 430 }
-        if case .hud = state { return 230 }
-        if hasActiveLiveActivity {
-            return ScreenNotchDetector.detect().hasNotch ? 385 : 340
+        if state.isExpanded { return 500 }
+        let hasNotch = ScreenNotchDetector.detect().hasNotch
+        if case .hud = state {
+            return hasNotch ? 385 : 240
         }
-        return ScreenNotchDetector.detect().hasNotch ? 220 : 204
+        if hasActiveLiveActivity {
+            return hasNotch ? 385 : 340
+        }
+        // Idle state: Exactly matches hardware notch (179px) on notched MacBooks
+        // Zero awkward ears or outlines sticking out!
+        return hasNotch ? 179 : 204
     }
 
     public var currentIslandHeight: CGFloat {
         if isDropHovered { return 120 }
-        let notchOffset: CGFloat = ScreenNotchDetector.detect().hasNotch ? 40 : 0
+        let hasNotch = ScreenNotchDetector.detect().hasNotch
+        let notchHeight: CGFloat = hasNotch ? 32 : 0
+
         if state.isExpanded {
             switch activeTab {
-            case .mirror: return 215 + notchOffset
-            case .calendar: return 190 + notchOffset
-            case .media: return 175 + notchOffset
-            case .timers: return 165 + notchOffset
-            case .system: return 175 + notchOffset
-            case .shelf: return 140 + notchOffset
-            case .clipboard: return 165 + notchOffset
-            case .launcher: return 145 + notchOffset
-            case .focus: return 150 + notchOffset
-            case .weather: return 145 + notchOffset
+            case .calendar: return 240 + notchHeight
+            case .mirror: return 220 + notchHeight
+            case .media: return 180 + notchHeight
+            case .timers: return 170 + notchHeight
+            case .system: return 180 + notchHeight
+            case .shelf: return 150 + notchHeight
+            case .clipboard: return 175 + notchHeight
+            case .launcher: return 150 + notchHeight
+            case .focus: return 155 + notchHeight
+            case .weather: return 150 + notchHeight
             }
         }
-        if case .hud = state { return 36 }
-        return 34
+        if case .hud = state {
+            return hasNotch ? 36 : 34
+        }
+        // Idle height: Exactly matches hardware notch height (32px) on notched MacBooks
+        return hasNotch ? 32 : 34
     }
 
     private var autoCollapseWorkItem: DispatchWorkItem?
@@ -162,12 +172,14 @@ public final class IslandCoordinator: ObservableObject {
         // MediaMate HUD Volume Listener
         systemControls.onVolumeChanged = { [weak self] vol, isMuted in
             guard let self = self, self.enableHUDOverlay else { return }
+            if self.state.isExpanded { return }
             self.showHUD(type: .volume, value: vol, isMuted: isMuted)
         }
 
         // MediaMate HUD Brightness Listener
         systemControls.onBrightnessChanged = { [weak self] brightness in
             guard let self = self, self.enableHUDOverlay else { return }
+            if self.state.isExpanded { return }
             self.showHUD(type: .brightness, value: brightness, isMuted: false)
         }
     }
@@ -233,7 +245,6 @@ public final class IslandCoordinator: ObservableObject {
         }
 
         self.activeTab = tab
-        IslandWindowController.shared.updateFrameForState(isExpanded: true)
 
         withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
             self.state = .expanded(tab)
@@ -263,8 +274,6 @@ public final class IslandCoordinator: ObservableObject {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
             self.state = .compact
         }
-
-        IslandWindowController.shared.updateFrameForState(isExpanded: false)
     }
 
     public func toggleExpanded() {

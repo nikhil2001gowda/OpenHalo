@@ -7,20 +7,35 @@ public struct IslandRootView: View {
 
     public init() {}
 
+    private var hasNotch: Bool {
+        ScreenNotchDetector.detect().hasNotch
+    }
+
+    private var shouldShowBorder: Bool {
+        if isDropTargeted { return true }
+        if coordinator.state.isExpanded { return true }
+        if case .hud = coordinator.state { return true }
+        // On notched screens when idle without active live activity: NO BORDER! Seamlessly blends into hardware notch
+        if hasNotch && !coordinator.hasActiveLiveActivity {
+            return false
+        }
+        return true
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .top) {
-                // Background Capsule (100% Solid Black, Zero Bleed-Through)
+                // Background Capsule (100% Optical Pure Black #000000 to match notch glass)
                 RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
-                    .fill(Color(red: 0.05, green: 0.05, blue: 0.06))
+                    .fill(Color.black)
                     .overlay(
                         RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
                             .strokeBorder(
-                                isDropTargeted ? Color.cyan : Color.white.opacity(0.15),
-                                lineWidth: isDropTargeted ? 1.5 : 0.8
+                                isDropTargeted ? Color.cyan : (shouldShowBorder ? Color.white.opacity(0.12) : Color.clear),
+                                lineWidth: isDropTargeted ? 1.5 : (shouldShowBorder ? 0.8 : 0)
                             )
                     )
-                    .shadow(color: Color.black.opacity(0.6), radius: 16, x: 0, y: 8)
+                    .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.7 : 0), radius: 18, x: 0, y: 8)
 
                 // Foreground Content
                 VStack(spacing: 0) {
@@ -69,12 +84,12 @@ public struct IslandRootView: View {
 
     private var currentCornerRadius: CGFloat {
         if coordinator.state.isExpanded || isDropTargeted {
-            return 26
+            return 24
         }
         if case .hud = coordinator.state {
             return 18
         }
-        return 17
+        return hasNotch ? 12 : 17
     }
 
     private func handleDroppedProviders(_ providers: [NSItemProvider]) -> Bool {

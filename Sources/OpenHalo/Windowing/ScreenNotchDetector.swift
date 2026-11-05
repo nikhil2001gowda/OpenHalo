@@ -42,9 +42,9 @@ public enum ScreenNotchDetector {
            rightArea.minX > leftArea.maxX {
 
             let notchWidth = rightArea.minX - leftArea.maxX
-            let notchHeight = frame.height - leftArea.height
+            let notchHeight = safeArea.top // Exactly 32.0 on modern notched MacBooks
             let notchOriginX = leftArea.maxX
-            let notchOriginY = frame.height - notchHeight
+            let notchOriginY = frame.height - safeArea.top
 
             let notchRect = CGRect(x: notchOriginX, y: notchOriginY, width: notchWidth, height: notchHeight)
             return DisplayGeometry(
