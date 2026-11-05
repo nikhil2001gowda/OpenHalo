@@ -116,3 +116,4 @@ public struct GlassyHaloLogoView: View {
         .frame(width: orbRadius * 2, height: orbRadius * 2)
     }
 }
+

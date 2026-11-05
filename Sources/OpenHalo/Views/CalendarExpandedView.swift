@@ -52,8 +52,10 @@ public struct CalendarExpandedView: View {
                         .frame(width: 22, height: 22)
                         .background(Color.white.opacity(0.08))
                         .clipShape(Circle())
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
                 .help("Previous Month")
 
                 Text(monthYearString(from: calendarService.displayedMonthDate))
@@ -68,8 +70,10 @@ public struct CalendarExpandedView: View {
                         .frame(width: 22, height: 22)
                         .background(Color.white.opacity(0.08))
                         .clipShape(Circle())
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
                 .help("Next Month")
             }
 
@@ -93,8 +97,10 @@ public struct CalendarExpandedView: View {
                 .padding(.vertical, 4)
                 .background(Color.white.opacity(0.1))
                 .cornerRadius(6)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .pointingHandCursor()
             .help("Jump to Today")
 
             // Toggle Quick Add Event
@@ -115,8 +121,10 @@ public struct CalendarExpandedView: View {
                 .padding(.vertical, 4)
                 .background(isAddingEvent ? Color.orange.opacity(0.2) : Color.white.opacity(0.12))
                 .cornerRadius(6)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .pointingHandCursor()
             .help("Schedule a new meeting or event")
 
             // Open in Apple Calendar
@@ -129,8 +137,10 @@ public struct CalendarExpandedView: View {
                     .frame(width: 24, height: 24)
                     .background(Color.white.opacity(0.08))
                     .clipShape(Circle())
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
+            .pointingHandCursor()
             .help("Open in Apple Calendar app")
         }
         .padding(.horizontal, 2)
@@ -193,8 +203,10 @@ public struct CalendarExpandedView: View {
                                 .padding(.vertical, 2)
                             }
                             .frame(height: 25)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .pointingHandCursor()
                     } else {
                         // Empty slot before month start
                         Color.clear
@@ -412,8 +424,10 @@ public struct CalendarExpandedView: View {
                         .padding(.vertical, 5)
                         .background(Color.white)
                         .cornerRadius(6)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
 
                 Button(action: {
                     isAddingEvent = false
@@ -426,8 +440,10 @@ public struct CalendarExpandedView: View {
                         .padding(.vertical, 5)
                         .background(Color.white.opacity(0.08))
                         .cornerRadius(6)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
             }
         }
         .padding(10)

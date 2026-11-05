@@ -48,8 +48,10 @@ public struct ClipboardExpandedView: View {
                             .padding(.vertical, 4)
                             .background(Color.white.opacity(0.1))
                             .cornerRadius(6)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .pointingHandCursor()
                     .help("Clear non-pinned items")
                 }
             }
@@ -76,8 +78,10 @@ public struct ClipboardExpandedView: View {
                             .padding(.vertical, 2.5)
                             .background(isSelected ? Color.white : Color.white.opacity(0.08))
                             .cornerRadius(5)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .pointingHandCursor()
                     }
                 }
                 .padding(.horizontal, 4)

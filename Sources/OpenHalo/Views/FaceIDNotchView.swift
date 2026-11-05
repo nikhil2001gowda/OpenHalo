@@ -72,3 +72,4 @@ public struct FaceIDNotchView: View {
         .frame(height: 32)
     }
 }
+

@@ -46,8 +46,10 @@ public struct WeatherExpandedView: View {
                         .padding(.vertical, 2.5)
                         .background(Color.white.opacity(0.08))
                         .cornerRadius(6)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .pointingHandCursor()
                     .help("Click to search any city")
 
                     // Auto-Detect Current Location Button
@@ -60,8 +62,10 @@ public struct WeatherExpandedView: View {
                             .frame(width: 22, height: 22)
                             .background(Color.cyan.opacity(0.15))
                             .clipShape(Circle())
+                            .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    .pointingHandCursor()
                     .help("Auto-detect current location via IP")
 
                     // Refresh Button
@@ -74,10 +78,12 @@ public struct WeatherExpandedView: View {
                             .frame(width: 22, height: 22)
                             .background(Color.white.opacity(0.1))
                             .clipShape(Circle())
+                            .contentShape(Circle())
                             .rotationEffect(.degrees(weatherService.isLoading ? 360 : 0))
                             .animation(weatherService.isLoading ? Animation.linear(duration: 1).repeatForever(autoreverses: false) : .default, value: weatherService.isLoading)
                     }
                     .buttonStyle(.plain)
+                    .pointingHandCursor()
                     .help("Refresh forecast")
                 }
             }

@@ -38,23 +38,24 @@ public struct FocusNoteExpandedView: View {
                     .font(.system(size: 11))
                     .foregroundColor(.white)
                     .onSubmit {
-                        focusService.addTask(title: newTaskText)
-                        newTaskText = ""
+                        submitNewTask()
                     }
                     .onTapGesture {
                         IslandCoordinator.shared.setKeyboardFocus(true)
                     }
 
                 Button(action: {
-                    focusService.addTask(title: newTaskText)
-                    newTaskText = ""
+                    submitNewTask()
                 }) {
                     Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 13))
-                        .foregroundColor(.yellow)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(canSubmitTask ? .yellow : Color.white.opacity(0.25))
+                        .frame(width: 26, height: 26)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .disabled(newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(!canSubmitTask)
+                .pointingHandCursor(enabled: canSubmitTask)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -70,10 +71,13 @@ public struct FocusNoteExpandedView: View {
                                 focusService.toggleTask(id: task.id)
                             }) {
                                 Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 13))
                                     .foregroundColor(task.isCompleted ? .green : Color.white.opacity(0.4))
+                                    .frame(width: 22, height: 22)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .pointingHandCursor()
 
                             Text(task.title)
                                 .font(.system(size: 11))
@@ -86,10 +90,13 @@ public struct FocusNoteExpandedView: View {
                                 focusService.deleteTask(id: task.id)
                             }) {
                                 Image(systemName: "trash")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(Color.white.opacity(0.3))
+                                    .font(.system(size: 10))
+                                    .foregroundColor(Color.white.opacity(0.35))
+                                    .frame(width: 22, height: 22)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .pointingHandCursor()
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -102,6 +109,17 @@ public struct FocusNoteExpandedView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
+    }
+
+    private var canSubmitTask: Bool {
+        !newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func submitNewTask() {
+        let trimmed = newTaskText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        focusService.addTask(title: trimmed)
+        newTaskText = ""
     }
 }
 

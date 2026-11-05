@@ -87,8 +87,10 @@ public struct SystemHealthView: View {
                     .padding(.vertical, 3.5)
                     .background(IslandCoordinator.shared.caffeinateService.isAwake ? Color.orange : Color.orange.opacity(0.15))
                     .cornerRadius(6)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
 
                 // Devly: UUID
                 Button(action: {
@@ -107,8 +109,10 @@ public struct SystemHealthView: View {
                     .padding(.vertical, 3.5)
                     .background(Color.cyan.opacity(0.12))
                     .cornerRadius(6)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
                 .help("Generate & copy UUID")
 
                 // Devly: Format JSON
@@ -130,8 +134,10 @@ public struct SystemHealthView: View {
                     .padding(.vertical, 3.5)
                     .background(Color.green.opacity(0.12))
                     .cornerRadius(6)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
                 .help("Format JSON on clipboard")
 
                 Spacer()

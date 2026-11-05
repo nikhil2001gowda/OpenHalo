@@ -29,11 +29,13 @@ public struct ExpandedCardView: View {
                     Image(systemName: "chevron.up")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(Color.white.opacity(0.6))
-                        .frame(width: 20, height: 20)
+                        .frame(width: 22, height: 22)
                         .background(Color.white.opacity(0.12))
                         .clipShape(Circle())
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .pointingHandCursor()
             }
             .padding(.horizontal, 12)
             .padding(.top, ScreenNotchDetector.detect().hasNotch ? 40 : 10)
@@ -118,8 +120,10 @@ public struct ExpandedCardView: View {
                     Color.white.opacity(0.04)
             )
             .cornerRadius(7)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .pointingHandCursor()
         .help(title)
     }
 }
