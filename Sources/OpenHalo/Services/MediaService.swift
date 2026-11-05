@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Combine
+import CoreAudio
 
 @MainActor
 public final class MediaService: ObservableObject {
@@ -9,18 +10,27 @@ public final class MediaService: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var progressTimer: Timer?
+    private var pollTimer: Timer?
+    private var outputAudioDeviceID: AudioDeviceID = 0
 
-    public static func isAppRunning(bundleID: String) -> Bool {
+    public nonisolated static func isAppRunning(bundleID: String) -> Bool {
         return !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
     }
 
-    public static func isAppInstalled(bundleID: String) -> Bool {
+    public nonisolated static func isAppInstalled(bundleID: String) -> Bool {
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil
     }
 
     public init() {
         setupDistributedNotificationObservers()
+        setupAudioOutputListener()
+        startPolling()
         checkActivePlayers()
+    }
+
+    deinit {
+        pollTimer?.invalidate()
+        progressTimer?.invalidate()
     }
 
     private func setupDistributedNotificationObservers() {
@@ -34,13 +44,97 @@ public final class MediaService: ObservableObject {
             object: nil
         )
 
-        // Spotify notification (auto-listens, will trigger automatically if user installs/runs Spotify)
+        // Spotify notification
         center.addObserver(
             self,
             selector: #selector(handleSpotifyNotification(_:)),
             name: NSNotification.Name("com.spotify.client.PlaybackStateChanged"),
             object: nil
         )
+    }
+
+    private func setupAudioOutputListener() {
+        var defaultOutputDevice = AudioDeviceID(0)
+        var propertySize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &propertySize,
+            &defaultOutputDevice
+        )
+
+        guard status == noErr && defaultOutputDevice != 0 else { return }
+        self.outputAudioDeviceID = defaultOutputDevice
+
+        var runningAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        AudioObjectAddPropertyListenerBlock(
+            defaultOutputDevice,
+            &runningAddress,
+            DispatchQueue.main
+        ) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.checkActivePlayers()
+            }
+        }
+    }
+
+    public func startPolling() {
+        pollTimer?.invalidate()
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.checkActivePlayers()
+            }
+        }
+    }
+
+    public func stopPolling() {
+        pollTimer?.invalidate()
+        pollTimer = nil
+    }
+
+    public nonisolated static func isSystemAudioOutputting() -> Bool {
+        var defaultOutputDevice = AudioDeviceID(0)
+        var propertySize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &propertySize,
+            &defaultOutputDevice
+        )
+
+        guard status == noErr && defaultOutputDevice != 0 else { return false }
+
+        var isRunning: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        var runAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let err = AudioObjectGetPropertyData(defaultOutputDevice, &runAddress, 0, nil, &size, &isRunning)
+        return (err == noErr && isRunning != 0)
     }
 
     @objc private func handleAppleMusicNotification(_ notification: Notification) {
@@ -65,10 +159,8 @@ public final class MediaService: ObservableObject {
             source: .appleMusic,
             artworkData: nil
         )
-        isAvailable = true
-
+        isAvailable = isPlaying
         updateProgressTimer()
-        fetchAppleMusicArtwork()
     }
 
     @objc private func handleSpotifyNotification(_ notification: Notification) {
@@ -93,8 +185,7 @@ public final class MediaService: ObservableObject {
             source: .spotify,
             artworkData: nil
         )
-        isAvailable = true
-
+        isAvailable = isPlaying
         updateProgressTimer()
     }
 
@@ -104,7 +195,7 @@ public final class MediaService: ObservableObject {
             progressTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     guard let self = self, self.currentTrack.isPlaying else { return }
-                    if self.currentTrack.position < self.currentTrack.duration {
+                    if self.currentTrack.duration > 0 && self.currentTrack.position < self.currentTrack.duration {
                         self.currentTrack.position += 1.0
                     }
                 }
@@ -112,23 +203,24 @@ public final class MediaService: ObservableObject {
         }
     }
 
+    // MARK: - Play / Pause Transport Controls
+
     public func togglePlayPause() {
         Task {
-            let isSpotifyRunning = Self.isAppRunning(bundleID: "com.spotify.client")
-            let isMusicRunning = Self.isAppRunning(bundleID: "com.apple.Music")
-
-            if currentTrack.source == .spotify && isSpotifyRunning {
-                await AppleScriptRunner.run("tell application id \"com.spotify.client\" to playpause")
-            } else if isMusicRunning {
-                await AppleScriptRunner.run("tell application id \"com.apple.Music\" to playpause")
-            } else if isSpotifyRunning {
-                await AppleScriptRunner.run("tell application id \"com.spotify.client\" to playpause")
-            } else if Self.isAppInstalled(bundleID: "com.apple.Music") {
-                // If neither is running, launch built-in Music cleanly via NSWorkspace (never prompts!)
-                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Music.app"))
+            switch currentTrack.source {
+            case .appleMusic:
+                if Self.isAppRunning(bundleID: "com.apple.Music") {
+                    await AppleScriptRunner.run("tell application id \"com.apple.Music\" to playpause")
+                }
+            case .spotify:
+                if Self.isAppRunning(bundleID: "com.spotify.client") {
+                    await AppleScriptRunner.run("tell application id \"com.spotify.client\" to playpause")
+                }
+            default:
+                // Universal macOS hardware media key (controls YouTube in Chrome, Safari, etc.)
+                sendSystemMediaKey(key: 16)
             }
 
-            // Toggle local optimistic state
             currentTrack.playbackState = (currentTrack.playbackState == .playing) ? .paused : .playing
             updateProgressTimer()
         }
@@ -136,20 +228,34 @@ public final class MediaService: ObservableObject {
 
     public func nextTrack() {
         Task {
-            if currentTrack.source == .spotify && Self.isAppRunning(bundleID: "com.spotify.client") {
-                await AppleScriptRunner.run("tell application id \"com.spotify.client\" to next track")
-            } else if Self.isAppRunning(bundleID: "com.apple.Music") {
-                await AppleScriptRunner.run("tell application id \"com.apple.Music\" to next track")
+            switch currentTrack.source {
+            case .appleMusic:
+                if Self.isAppRunning(bundleID: "com.apple.Music") {
+                    await AppleScriptRunner.run("tell application id \"com.apple.Music\" to next track")
+                }
+            case .spotify:
+                if Self.isAppRunning(bundleID: "com.spotify.client") {
+                    await AppleScriptRunner.run("tell application id \"com.spotify.client\" to next track")
+                }
+            default:
+                sendSystemMediaKey(key: 19)
             }
         }
     }
 
     public func previousTrack() {
         Task {
-            if currentTrack.source == .spotify && Self.isAppRunning(bundleID: "com.spotify.client") {
-                await AppleScriptRunner.run("tell application id \"com.spotify.client\" to previous track")
-            } else if Self.isAppRunning(bundleID: "com.apple.Music") {
-                await AppleScriptRunner.run("tell application id \"com.apple.Music\" to previous track")
+            switch currentTrack.source {
+            case .appleMusic:
+                if Self.isAppRunning(bundleID: "com.apple.Music") {
+                    await AppleScriptRunner.run("tell application id \"com.apple.Music\" to previous track")
+                }
+            case .spotify:
+                if Self.isAppRunning(bundleID: "com.spotify.client") {
+                    await AppleScriptRunner.run("tell application id \"com.spotify.client\" to previous track")
+                }
+            default:
+                sendSystemMediaKey(key: 20)
             }
         }
     }
@@ -160,20 +266,32 @@ public final class MediaService: ObservableObject {
         Task {
             if currentTrack.source == .spotify && Self.isAppRunning(bundleID: "com.spotify.client") {
                 await AppleScriptRunner.run("tell application id \"com.spotify.client\" to set player position to \(targetSeconds)")
-            } else if Self.isAppRunning(bundleID: "com.apple.Music") {
+            } else if currentTrack.source == .appleMusic && Self.isAppRunning(bundleID: "com.apple.Music") {
                 await AppleScriptRunner.run("tell application id \"com.apple.Music\" to set player position to \(targetSeconds)")
             }
         }
     }
 
-    private func checkActivePlayers() {
-        Task {
-            // ONLY query applications that are currently active in process table
-            // This guarantees macOS NEVER pops up a "Where is <App>?" dialog
-            let isMusicRunning = Self.isAppRunning(bundleID: "com.apple.Music")
-            let isSpotifyRunning = Self.isAppRunning(bundleID: "com.spotify.client")
+    private func sendSystemMediaKey(key: Int32) {
+        let downFlags = NSEvent.ModifierFlags(rawValue: 0xa00)
+        let upFlags = NSEvent.ModifierFlags(rawValue: 0xb00)
+        let dataDown = Int((key << 16) | (0xa << 8))
+        let dataUp = Int((key << 16) | (0xb << 8))
 
-            if isMusicRunning {
+        if let downEvent = NSEvent.otherEvent(with: .systemDefined, location: .zero, modifierFlags: downFlags, timestamp: 0, windowNumber: 0, context: nil, subtype: 8, data1: dataDown, data2: -1)?.cgEvent {
+            downEvent.post(tap: .cghidEventTap)
+        }
+        if let upEvent = NSEvent.otherEvent(with: .systemDefined, location: .zero, modifierFlags: upFlags, timestamp: 0, windowNumber: 0, context: nil, subtype: 8, data1: dataUp, data2: -1)?.cgEvent {
+            upEvent.post(tap: .cghidEventTap)
+        }
+    }
+
+    // MARK: - Multi-Source Media Detection (Music, Spotify, Chrome, Safari, YouTube, Web)
+
+    public func checkActivePlayers() {
+        Task.detached(priority: .userInitiated) {
+            // 1. Check Apple Music
+            if Self.isAppRunning(bundleID: "com.apple.Music") {
                 let script = """
                 tell application id "com.apple.Music"
                     if player state is playing then
@@ -183,12 +301,13 @@ public final class MediaService: ObservableObject {
                 return "none"
                 """
                 if let output = await AppleScriptRunner.run(script), output != "none" {
-                    self.parseAndSetTrack(output: output)
+                    await self.parseAndSetTrack(output: output)
                     return
                 }
             }
 
-            if isSpotifyRunning {
+            // 2. Check Spotify
+            if Self.isAppRunning(bundleID: "com.spotify.client") {
                 let script = """
                 tell application id "com.spotify.client"
                     if player state is playing then
@@ -198,11 +317,151 @@ public final class MediaService: ObservableObject {
                 return "none"
                 """
                 if let output = await AppleScriptRunner.run(script), output != "none" {
-                    self.parseAndSetTrack(output: output)
+                    await self.parseAndSetTrack(output: output)
                     return
                 }
             }
+
+            // 3. Check Google Chrome (YouTube, Spotify Web, SoundCloud, Twitch, etc.)
+            if Self.isAppRunning(bundleID: "com.google.Chrome") {
+                let script = """
+                tell application "Google Chrome"
+                    repeat with w in windows
+                        repeat with t in tabs of w
+                            set u to URL of t
+                            if u contains "youtube.com/watch" or u contains "music.youtube.com" or u contains "soundcloud.com" or u contains "spotify.com" or u contains "twitch.tv" or u contains "netflix.com" or u contains "hotstar.com" or u contains "primevideo.com" then
+                                return (title of t) & "|||" & u & "|||Chrome"
+                            end if
+                        end repeat
+                    end repeat
+                end tell
+                return "none"
+                """
+                if let output = await AppleScriptRunner.run(script), output != "none" {
+                    await self.parseBrowserMedia(output: output, browserName: "Google Chrome")
+                    return
+                }
+            }
+
+            // 4. Check Safari
+            if Self.isAppRunning(bundleID: "com.apple.Safari") {
+                let script = """
+                tell application "Safari"
+                    repeat with w in windows
+                        repeat with t in tabs of w
+                            set u to URL of t
+                            if u contains "youtube.com/watch" or u contains "music.youtube.com" or u contains "soundcloud.com" or u contains "spotify.com" or u contains "twitch.tv" or u contains "netflix.com" then
+                                return (name of t) & "|||" & u & "|||Safari"
+                            end if
+                        end repeat
+                    end repeat
+                end tell
+                return "none"
+                """
+                if let output = await AppleScriptRunner.run(script), output != "none" {
+                    await self.parseBrowserMedia(output: output, browserName: "Safari")
+                    return
+                }
+            }
+
+            // 5. Check QuickTime Player
+            if Self.isAppRunning(bundleID: "com.apple.QuickTimePlayerX") {
+                let script = """
+                tell application "QuickTime Player"
+                    if exists (document 1) and (playing of document 1) then
+                        return "QuickTime|" & (name of document 1)
+                    end if
+                end tell
+                return "none"
+                """
+                if let output = await AppleScriptRunner.run(script), output != "none" {
+                    let parts = output.components(separatedBy: "|")
+                    let docName = parts.count > 1 ? parts[1] : "Video"
+                    await self.setGenericPlayingTrack(title: docName, artist: "QuickTime Player", source: .quickTime)
+                    return
+                }
+            }
+
+            // 6. Generic Audio Check: Is system outputting audio?
+            let isAudioOutputting = Self.isSystemAudioOutputting()
+            if isAudioOutputting {
+                // If audio is actively playing through speakers but neither Music/Spotify/Chrome tab was matched,
+                // keep current track active or display System Audio
+                await MainActor.run {
+                    if !self.currentTrack.title.isEmpty && self.currentTrack.title != "No Media Playing" {
+                        self.currentTrack.playbackState = .playing
+                        self.isAvailable = true
+                    }
+                }
+            } else {
+                // Audio has stopped
+                await MainActor.run {
+                    if self.currentTrack.source != .appleMusic && self.currentTrack.source != .spotify {
+                        self.currentTrack.playbackState = .paused
+                    }
+                }
+            }
         }
+    }
+
+    private func parseBrowserMedia(output: String, browserName: String) {
+        let parts = output.components(separatedBy: "|||")
+        guard parts.count >= 2 else { return }
+
+        var rawTitle = parts[0]
+        let url = parts[1]
+
+        var source: MusicSource = .webMedia
+        var artist = browserName
+
+        if url.contains("youtube.com") || url.contains("youtu.be") {
+            source = .youtube
+            artist = "YouTube • \(browserName)"
+            // Clean title by removing standard " - YouTube" suffix
+            if rawTitle.hasSuffix(" - YouTube") {
+                rawTitle = String(rawTitle.dropLast(" - YouTube".count))
+            } else if rawTitle.hasSuffix(" - YouTube Music") {
+                rawTitle = String(rawTitle.dropLast(" - YouTube Music".count))
+            }
+        } else if url.contains("spotify.com") {
+            source = .spotify
+            artist = "Spotify Web"
+        } else if url.contains("soundcloud.com") {
+            source = .webMedia
+            artist = "SoundCloud"
+        } else if url.contains("netflix.com") {
+            source = .webMedia
+            artist = "Netflix"
+        } else if url.contains("twitch.tv") {
+            source = .webMedia
+            artist = "Twitch"
+        }
+
+        self.currentTrack = MediaTrack(
+            title: rawTitle.isEmpty ? "Media Playing" : rawTitle,
+            artist: artist,
+            album: "",
+            duration: 0,
+            position: 0,
+            playbackState: .playing,
+            source: source
+        )
+        self.isAvailable = true
+        self.updateProgressTimer()
+    }
+
+    private func setGenericPlayingTrack(title: String, artist: String, source: MusicSource) {
+        self.currentTrack = MediaTrack(
+            title: title,
+            artist: artist,
+            album: "",
+            duration: 0,
+            position: 0,
+            playbackState: .playing,
+            source: source
+        )
+        self.isAvailable = true
+        self.updateProgressTimer()
     }
 
     private func parseAndSetTrack(output: String) {
@@ -225,24 +484,6 @@ public final class MediaService: ObservableObject {
             )
             self.isAvailable = true
             self.updateProgressTimer()
-        }
-    }
-
-    private func fetchAppleMusicArtwork() {
-        guard Self.isAppRunning(bundleID: "com.apple.Music") else { return }
-        Task {
-            let script = """
-            tell application id "com.apple.Music"
-                if player state is playing then
-                    try
-                        set rawData to raw data of artwork 1 of current track
-                        return "has_artwork"
-                    end try
-                end if
-            end tell
-            return "none"
-            """
-            _ = await AppleScriptRunner.run(script)
         }
     }
 }

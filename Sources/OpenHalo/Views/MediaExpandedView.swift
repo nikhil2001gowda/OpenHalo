@@ -25,9 +25,9 @@ public struct MediaExpandedView: View {
                         .fill(Color(red: 0.16, green: 0.16, blue: 0.18))
                         .frame(width: 46, height: 46)
 
-                    Image(systemName: mediaService.currentTrack.source == .spotify ? "music.note" : "apple.logo")
+                    Image(systemName: isTrackActive ? mediaService.currentTrack.source.iconName : "music.note")
                         .font(.system(size: 22))
-                        .foregroundColor(mediaService.currentTrack.source == .spotify ? .green : .pink)
+                        .foregroundColor(sourceColor(mediaService.currentTrack.source))
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -108,7 +108,7 @@ public struct MediaExpandedView: View {
 
                 // Playing Waveform
                 if mediaService.currentTrack.isPlaying {
-                    AudioWaveformBarView(isPlaying: true, color: .green)
+                    AudioWaveformBarView(isPlaying: true, color: sourceColor(mediaService.currentTrack.source))
                         .padding(.trailing, 4)
                 }
             }
@@ -203,5 +203,19 @@ public struct MediaExpandedView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+
+    private func sourceColor(_ source: MusicSource) -> Color {
+        switch source {
+        case .appleMusic: return .pink
+        case .spotify: return .green
+        case .youtube: return .red
+        case .chrome: return .blue
+        case .safari: return .blue
+        case .webMedia: return .cyan
+        case .quickTime: return .blue
+        case .vlc: return .orange
+        case .system: return .white
+        }
     }
 }

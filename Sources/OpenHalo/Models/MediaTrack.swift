@@ -4,7 +4,41 @@ import AppKit
 public enum MusicSource: String, Sendable {
     case appleMusic = "Apple Music"
     case spotify = "Spotify"
+    case youtube = "YouTube"
+    case chrome = "Google Chrome"
+    case safari = "Safari"
+    case webMedia = "Web Media"
+    case quickTime = "QuickTime"
+    case vlc = "VLC"
     case system = "System"
+
+    public var iconName: String {
+        switch self {
+        case .appleMusic: return "apple.logo"
+        case .spotify: return "music.note"
+        case .youtube: return "play.rectangle.fill"
+        case .chrome: return "globe"
+        case .safari: return "safari"
+        case .webMedia: return "waveform"
+        case .quickTime: return "play.tv.fill"
+        case .vlc: return "cone.fill"
+        case .system: return "speaker.wave.2.fill"
+        }
+    }
+
+    public var brandColorName: String {
+        switch self {
+        case .appleMusic: return "pink"
+        case .spotify: return "green"
+        case .youtube: return "red"
+        case .chrome: return "blue"
+        case .safari: return "blue"
+        case .webMedia: return "cyan"
+        case .quickTime: return "blue"
+        case .vlc: return "orange"
+        case .system: return "white"
+        }
+    }
 }
 
 public enum PlaybackState: String, Sendable {
@@ -66,4 +100,3 @@ public struct MediaTrack: Equatable, Sendable {
         return String(format: "%d:%02d", mins, secs)
     }
 }
-
