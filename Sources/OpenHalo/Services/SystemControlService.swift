@@ -1,35 +1,137 @@
 import Foundation
 import CoreAudio
 import AppKit
+import CoreGraphics
 
 @MainActor
 public final class SystemControlService: ObservableObject {
     @Published public var volume: Float = 0.5
-    @Published public var brightness: Float = 0.75
+    @Published public var brightness: Float = 0.5
     @Published public var isMuted: Bool = false
 
     public var onVolumeChanged: ((Float, Bool) -> Void)?
     public var onBrightnessChanged: ((Float) -> Void)?
 
     private var currentOutputDeviceID: AudioDeviceID = 0
-    private var isObserving: Bool = false
+    private var syncTimer: Timer?
+
+    // Private DisplayServices Dynamic Function Pointers
+    private typealias GetBrightnessFunc = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
+    private typealias SetBrightnessFunc = @convention(c) (CGDirectDisplayID, Float) -> Int32
+    private var getBrightnessPointer: GetBrightnessFunc?
+    private var setBrightnessPointer: SetBrightnessFunc?
 
     public init() {
+        setupDisplayServices()
         fetchCurrentVolume()
         fetchCurrentBrightness()
+        setupDefaultDeviceListener()
         startHardwareVolumeListener()
+        startPeriodicSync()
     }
 
     deinit {
-        // Cleanup listener if needed
+        syncTimer?.invalidate()
     }
 
-    // MARK: - CoreAudio Hardware Volume Observation (MediaMate HUD Replacement)
+    // MARK: - DisplayServices Initialization
+
+    private func setupDisplayServices() {
+        if let handle = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_NOW) {
+            if let getSym = dlsym(handle, "DisplayServicesGetLinearBrightness") {
+                getBrightnessPointer = unsafeBitCast(getSym, to: GetBrightnessFunc.self)
+            }
+            if let setSym = dlsym(handle, "DisplayServicesSetLinearBrightness") {
+                setBrightnessPointer = unsafeBitCast(setSym, to: SetBrightnessFunc.self)
+            }
+        }
+    }
+
+    // MARK: - Periodic Hardware Sync (Catches F1/F2 & F11/F12 Keyboard Keys)
+
+    public func startPeriodicSync() {
+        syncTimer?.invalidate()
+        syncTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.syncHardwareState()
+            }
+        }
+    }
+
+    public func stopHardwareVolumeListener() {
+        syncTimer?.invalidate()
+        syncTimer = nil
+    }
+
+    private func syncHardwareState() {
+        // 1. Sync Brightness
+        if let fn = getBrightnessPointer {
+            var currentHardwareB: Float = 0.0
+            if fn(CGMainDisplayID(), &currentHardwareB) == 0 {
+                let clamped = max(0.0, min(1.0, currentHardwareB))
+                if abs(clamped - self.brightness) > 0.015 {
+                    self.brightness = clamped
+                    self.onBrightnessChanged?(clamped)
+                }
+            }
+        }
+
+        // 2. Sync Volume
+        let currentHardwareVol = getHardwareVolumeScalar()
+        if abs(currentHardwareVol - self.volume) > 0.015 {
+            self.volume = currentHardwareVol
+            self.onVolumeChanged?(currentHardwareVol, self.isMuted)
+        }
+    }
+
+    // MARK: - Display Brightness Management (Real-time Bidirectional)
+
+    public func fetchCurrentBrightness() {
+        if let fn = getBrightnessPointer {
+            var currentHardwareB: Float = 0.5
+            if fn(CGMainDisplayID(), &currentHardwareB) == 0 {
+                self.brightness = max(0.0, min(1.0, currentHardwareB))
+                return
+            }
+        }
+        self.brightness = 0.5
+    }
+
+    public func setBrightness(_ newBrightness: Float) {
+        let clamped = max(0.0, min(1.0, newBrightness))
+        self.brightness = clamped
+
+        if let fn = setBrightnessPointer {
+            _ = fn(CGMainDisplayID(), clamped)
+        }
+
+        self.onBrightnessChanged?(clamped)
+    }
+
+    // MARK: - Volume Management (Real-time Bidirectional)
+
+    private func setupDefaultDeviceListener() {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            DispatchQueue.main
+        ) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.startHardwareVolumeListener()
+                self.fetchCurrentVolume()
+            }
+        }
+    }
 
     public func startHardwareVolumeListener() {
-        guard !isObserving else { return }
-        isObserving = true
-
         var defaultOutputDevice = AudioDeviceID(0)
         var propertySize = UInt32(MemoryLayout<AudioDeviceID>.size)
         var address = AudioObjectPropertyAddress(
@@ -49,37 +151,28 @@ public final class SystemControlService: ObservableObject {
 
         if status == noErr && defaultOutputDevice != 0 {
             self.currentOutputDeviceID = defaultOutputDevice
-            registerVolumeListener(for: defaultOutputDevice)
-        }
-    }
 
-    public func stopHardwareVolumeListener() {
-        isObserving = false
-    }
+            var volumeAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyVolumeScalar,
+                mScope: kAudioDevicePropertyScopeOutput,
+                mElement: kAudioObjectPropertyElementMain
+            )
 
-    private func registerVolumeListener(for deviceID: AudioDeviceID) {
-        var volumeAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyVolumeScalar,
-            mScope: kAudioDevicePropertyScopeOutput,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        AudioObjectAddPropertyListenerBlock(
-            deviceID,
-            &volumeAddress,
-            DispatchQueue.main
-        ) { [weak self] _, _ in
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
-                self.fetchCurrentVolume()
-                self.onVolumeChanged?(self.volume, self.isMuted)
+            AudioObjectAddPropertyListenerBlock(
+                defaultOutputDevice,
+                &volumeAddress,
+                DispatchQueue.main
+            ) { [weak self] _, _ in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    self.fetchCurrentVolume()
+                    self.onVolumeChanged?(self.volume, self.isMuted)
+                }
             }
         }
     }
 
-    // MARK: - Volume Management (CoreAudio + AppleScript Fallback)
-
-    public func fetchCurrentVolume() {
+    private func getHardwareVolumeScalar() -> Float {
         var defaultOutputDevice = AudioDeviceID(0)
         var propertySize = UInt32(MemoryLayout<AudioDeviceID>.size)
         var address = AudioObjectPropertyAddress(
@@ -97,10 +190,7 @@ public final class SystemControlService: ObservableObject {
             &defaultOutputDevice
         )
 
-        guard status == noErr && defaultOutputDevice != 0 else {
-            fallbackFetchVolume()
-            return
-        }
+        guard status == noErr && defaultOutputDevice != 0 else { return self.volume }
 
         var volumeScalar: Float32 = 0.5
         var volumeSize = UInt32(MemoryLayout<Float32>.size)
@@ -120,10 +210,24 @@ public final class SystemControlService: ObservableObject {
         )
 
         if volStatus == noErr {
-            self.volume = max(0.0, min(1.0, Float(volumeScalar)))
-        } else {
-            fallbackFetchVolume()
+            return max(0.0, min(1.0, Float(volumeScalar)))
         }
+
+        // Fallback channel 1
+        var leftAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyVolumeScalar,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: 1
+        )
+        if AudioObjectGetPropertyData(defaultOutputDevice, &leftAddress, 0, nil, &volumeSize, &volumeScalar) == noErr {
+            return max(0.0, min(1.0, Float(volumeScalar)))
+        }
+
+        return self.volume
+    }
+
+    public func fetchCurrentVolume() {
+        self.volume = getHardwareVolumeScalar()
     }
 
     public func setVolume(_ newVolume: Float) {
@@ -147,65 +251,38 @@ public final class SystemControlService: ObservableObject {
             &defaultOutputDevice
         )
 
-        var setViaCoreAudio = false
         if status == noErr && defaultOutputDevice != 0 {
             var volumeScalar = Float32(clamped)
             let volumeSize = UInt32(MemoryLayout<Float32>.size)
-            var volumeAddress = AudioObjectPropertyAddress(
+
+            var mainAddress = AudioObjectPropertyAddress(
                 mSelector: kAudioDevicePropertyVolumeScalar,
                 mScope: kAudioDevicePropertyScopeOutput,
                 mElement: kAudioObjectPropertyElementMain
             )
+            _ = AudioObjectSetPropertyData(defaultOutputDevice, &mainAddress, 0, nil, volumeSize, &volumeScalar)
 
-            let setStatus = AudioObjectSetPropertyData(
-                defaultOutputDevice,
-                &volumeAddress,
-                0,
-                nil,
-                volumeSize,
-                &volumeScalar
+            var ch1Address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyVolumeScalar,
+                mScope: kAudioDevicePropertyScopeOutput,
+                mElement: 1
             )
-            setViaCoreAudio = (setStatus == noErr)
+            _ = AudioObjectSetPropertyData(defaultOutputDevice, &ch1Address, 0, nil, volumeSize, &volumeScalar)
+
+            var ch2Address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyVolumeScalar,
+                mScope: kAudioDevicePropertyScopeOutput,
+                mElement: 2
+            )
+            _ = AudioObjectSetPropertyData(defaultOutputDevice, &ch2Address, 0, nil, volumeSize, &volumeScalar)
         }
 
-        if !setViaCoreAudio {
-            let volumePercent = Int(clamped * 100)
-            Task {
-                await AppleScriptRunner.run("set volume output volume \(volumePercent)")
-            }
-        }
-    }
-
-    private func fallbackFetchVolume() {
+        // AppleScript fallback
+        let volumePercent = Int(clamped * 100)
         Task {
-            if let output = await AppleScriptRunner.run("output volume of (get volume settings)"),
-               let volInt = Int(output.trimmingCharacters(in: .whitespacesAndNewlines)) {
-                self.volume = Float(volInt) / 100.0
-            }
+            await AppleScriptRunner.run("set volume output volume \(volumePercent)")
         }
-    }
 
-    // MARK: - Display Brightness Management
-
-    public func fetchCurrentBrightness() {
-        // Safe default or query display brightness
-        self.brightness = 0.75
-    }
-
-    public func setBrightness(_ newBrightness: Float) {
-        let clamped = max(0.0, min(1.0, newBrightness))
-        self.brightness = clamped
-        self.onBrightnessChanged?(clamped)
-
-        let brightnessPercent = Int(clamped * 100)
-        Task {
-            let script = """
-            tell application "System Events"
-                -- Brightness update trigger
-            end tell
-            """
-            _ = await AppleScriptRunner.run(script)
-            _ = brightnessPercent
-        }
+        self.onVolumeChanged?(clamped, self.isMuted)
     }
 }
