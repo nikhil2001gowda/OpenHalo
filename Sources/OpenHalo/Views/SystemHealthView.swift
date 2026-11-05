@@ -70,6 +70,74 @@ public struct SystemHealthView: View {
             }
             .padding(.horizontal, 4)
 
+            // Stay Awake (Caffeinate) & Devly Tools Bar
+            HStack(spacing: 8) {
+                // Stay Awake Toggle
+                Button(action: {
+                    IslandCoordinator.shared.caffeinateService.toggleStayAwake(durationMinutes: 60)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: IslandCoordinator.shared.caffeinateService.isAwake ? "cup.and.saucer.fill" : "cup.and.saucer")
+                            .font(.system(size: 10))
+                        Text(IslandCoordinator.shared.caffeinateService.isAwake ? "Awake (\(IslandCoordinator.shared.caffeinateService.remainingMinutes)m)" : "Stay Awake")
+                            .font(.system(size: 9.5, weight: .semibold))
+                    }
+                    .foregroundColor(IslandCoordinator.shared.caffeinateService.isAwake ? .black : .orange)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3.5)
+                    .background(IslandCoordinator.shared.caffeinateService.isAwake ? Color.orange : Color.orange.opacity(0.15))
+                    .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+
+                // Devly: UUID
+                Button(action: {
+                    let uuid = DeveloperToolsService.generateUUID()
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(uuid, forType: .string)
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "number")
+                            .font(.system(size: 9))
+                        Text("UUID")
+                            .font(.system(size: 9.5, weight: .medium))
+                    }
+                    .foregroundColor(.cyan)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3.5)
+                    .background(Color.cyan.opacity(0.12))
+                    .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                .help("Generate & copy UUID")
+
+                // Devly: Format JSON
+                Button(action: {
+                    if let clip = NSPasteboard.general.string(forType: .string) {
+                        let formatted = DeveloperToolsService.formatJSON(clip)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(formatted, forType: .string)
+                    }
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "curlybraces")
+                            .font(.system(size: 9))
+                        Text("Format JSON")
+                            .font(.system(size: 9.5, weight: .medium))
+                    }
+                    .foregroundColor(.green)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3.5)
+                    .background(Color.green.opacity(0.12))
+                    .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                .help("Format JSON on clipboard")
+
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+
             // Bottom Status Line
             HStack {
                 HStack(spacing: 6) {

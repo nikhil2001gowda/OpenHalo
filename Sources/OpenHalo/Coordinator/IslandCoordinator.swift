@@ -60,6 +60,7 @@ public final class IslandCoordinator: ObservableObject {
     public let powerSuspension = PowerSuspensionCoordinator.shared
     public let launchAtLogin = LaunchAtLoginService.shared
     public let screenLockFaceService = ScreenLockFaceService.shared
+    public let caffeinateService = CaffeinateService.shared
 
     // MARK: - Dynamic Capsule Dimensions
 

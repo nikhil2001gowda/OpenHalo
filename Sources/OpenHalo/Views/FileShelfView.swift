@@ -150,6 +150,24 @@ public struct FileShelfView: View {
 
             if isImageFile(item.url) {
                 Divider()
+                Menu("Vision AI Tools") {
+                    Button("Remove Background (AI)") {
+                        Task {
+                            if let output = try? await VisionProcessingService.removeBackground(from: item.url) {
+                                fileShelfService.addFiles([output])
+                            }
+                        }
+                    }
+                    Button("Extract Text (OCR)") {
+                        Task {
+                            if let text = try? await VisionProcessingService.extractText(from: item.url), !text.isEmpty {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(text, forType: .string)
+                            }
+                        }
+                    }
+                }
+
                 Menu("SIPS Convert Image") {
                     Button("Convert to PNG") {
                         Task { await fileShelfService.convertItem(item, to: .png) }

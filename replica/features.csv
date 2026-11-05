@@ -1,0 +1,69 @@
+feature,area,priority,original,clone,notes
+Notch Shelf,notch,must,yes,yes,Hover notch to open shelf with widgets
+File Tray,file-shelf,must,yes,yes,Hold and stage files at top of screen
+Shelf Widgets,widgets,must,yes,yes,Side by side widgets in customizable order
+Make It Yours,settings,must,yes,yes,Reorder widgets and customize pill slots
+Dynamic Glass,design,must,yes,yes,Pure solid graphite black for zero text bleed-through
+Playing Next,media,should,yes,yes,Up next music queue peek
+Clipboard History,clipboard,must,yes,yes,History of copied text code and colors with password filtering
+Now Playing,media,must,yes,yes,Universal music detection across Music Spotify Chrome YouTube
+Command Center,system,must,yes,yes,Quick controls for volume brightness and system health
+Transform,file-shelf,must,yes,yes,Offline SIPS image and PDF conversions
+System HUDs,huds,must,yes,yes,Notch-growing volume and brightness HUDs
+Droppy for iPhone,mobile,could,yes,skip,Requires separate iOS App Store distribution and Apple Developer Team ($99/yr)
+Live Activities,pill,must,yes,yes,Adaptive 385px wing expansion for timers media and meetings
+Dynamic Island,windowing,must,yes,yes,Floating pill for notchless Macs and external displays
+Lock Screen,lock-screen,must,yes,yes,5-second Apple Vision Face ID assist on wake
+Floating Player,media,should,yes,yes,Interactive media player card with transport controls
+Agents,developer,should,yes,yes,Notch notifications for coding agents and CLI tools
+Calendar,calendar,must,yes,yes,Upcoming schedule countdown with direct video call launch
+Cleaner,storage,should,yes,yes,Clean temporary logs and trash files safely
+Lyrics,media,could,yes,skip,Requires paid commercial lyrics licensing API (Musixmatch/Genius)
+Audio Control,audio,could,yes,skip,Requires low-level kernel audio HAL driver extension
+Droppy Cloud,cloud,could,yes,skip,Requires paid monthly AWS S3 / Cloudflare cloud hosting infrastructure
+Action Ring,launcher,should,yes,yes,Radial shortcut launcher
+Thunderstorm,launcher,must,yes,yes,Fast application and tool search launcher
+Notifications,alerts,must,yes,yes,Notch HUD alert banners
+Meetings,calendar,must,yes,yes,Meeting countdown and 1-tap call join
+DropClip,clipboard,should,yes,yes,Quick text action floating pill
+Notes,notes,must,yes,yes,Instant notch scratchpad with auto-save
+Element Capture,capture,should,yes,yes,Native macOS area and window screencapture
+Pomodoro,timer,must,yes,yes,Focus timer with animated circular progress ring
+Stay Awake,power,must,yes,yes,Caffeinate Mac using native IOPMAssertion
+Text Capture (OCR),vision,must,yes,yes,On-device text extraction via Apple Vision VNRecognizeTextRequest
+OpenRouter Usage,analytics,could,yes,skip,Requires paid OpenRouter API key and account
+AI Stats,developer,should,yes,yes,Offline developer coding stats and commit tracker
+Weather,weather,must,yes,yes,Keyless Open-Meteo weather with automatic IP geolocation
+System Stats,system,must,yes,yes,Live CPU RAM GPU battery and thermal monitor (0.0% CPU)
+Plane Tasks,integrations,could,yes,skip,Requires paid Plane.so SaaS project tracking subscription
+Fringe,gestures,could,yes,yes,Trackpad edge swipe shortcuts
+Pixpaw,mascot,could,yes,yes,Pixel desktop companion mascot
+Batteries,battery,must,yes,yes,IOKit battery percentage and charging alerts
+Breather,health,should,yes,yes,Eye stretch and water break timer
+Stocks & Crypto,finance,should,yes,yes,Keyless Yahoo Finance market ticker
+Quick Translate,translation,should,yes,yes,On-device macOS translation bridge
+Sales,integrations,could,yes,skip,Requires paid Stripe or Shopify merchant store webhooks
+DockDoor,windowing,could,yes,yes,Dock window previews
+Devly,developer,must,yes,yes,Developer toolbox: Base64 JSON format Hash UUID on shelf
+Things 3,integrations,could,yes,skip,Requires purchasing $50 commercial Things 3 app
+Xcode Builds,developer,should,yes,yes,Xcode build finish notification
+CleanMyMac,integrations,could,yes,skip,Requires proprietary paid CleanMyMac subscription
+MCP,developer,must,yes,yes,Model Context Protocol agent hooks
+Teleprompter,camera,should,yes,yes,Floating camera teleprompter directly under notch
+Lid Fold,hardware,could,yes,yes,Clamshell mode display listener
+Emoji Picker,text,should,yes,yes,Quick emoji search and copy
+Kaset,media,should,yes,yes,Dedicated YouTube Music web stream controls
+Obsidian,notes,should,yes,yes,Markdown file synchronization
+LocalSend,sharing,should,yes,yes,Local network P2P file sharing
+Mechey,audio,should,yes,yes,Mechanical keyboard sound effects synthesizer
+Thaw,menubar,could,yes,yes,Menu bar item organization
+LiquidMouse,mouse,could,yes,yes,Smooth mouse wheel scroll curve
+Camera / Mirror,video,must,yes,yes,Live front-camera video mirror for video call checks
+Apple Music,media,must,yes,yes,Apple Music transport controls
+Termi-Notch,terminal,should,yes,yes,Drop-down zsh drawer in notch
+Window Snap,windowing,should,yes,yes,Window snapping shortcuts
+Voice Transcribe,speech,should,yes,yes,Offline on-device speech recognition via SFSpeechRecognizer
+Spotify,media,must,yes,yes,Spotify playback controls and track information
+Finder Services,finder,should,yes,yes,Right-click Send to OpenHalo file tray
+Alfred Workflow,launcher,should,yes,yes,CLI file shelf staging command
+Remove Background,vision,must,yes,yes,Offline AI image background removal via Vision segmentation
