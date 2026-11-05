@@ -85,50 +85,73 @@ public struct WeatherExpandedView: View {
 
             // Search Bar (Expands inline when user clicks city name or magnifying glass)
             if isSearching {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 10))
-                        .foregroundColor(Color.white.opacity(0.5))
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color.white.opacity(0.5))
 
-                    TextField("Type city (e.g., Bengaluru, Mumbai, London)...", text: $searchCityText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 11))
-                        .foregroundColor(.white)
-                        .onSubmit {
-                            submitCitySearch()
+                        TextField("Type city (e.g., Bengaluru, Mumbai, London)...", text: $searchCityText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11))
+                            .foregroundColor(.white)
+                            .onSubmit {
+                                submitCitySearch()
+                            }
+
+                        if !searchCityText.isEmpty {
+                            Button(action: {
+                                submitCitySearch()
+                            }) {
+                                Text("Set")
+                                    .font(.system(size: 9.5, weight: .semibold))
+                                    .foregroundColor(.black)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(Color.white)
+                                    .cornerRadius(5)
+                            }
+                            .buttonStyle(.plain)
                         }
 
-                    if !searchCityText.isEmpty {
                         Button(action: {
-                            submitCitySearch()
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                                isSearching = false
+                                IslandCoordinator.shared.setKeyboardFocus(false)
+                            }
                         }) {
-                            Text("Set")
-                                .font(.system(size: 9.5, weight: .semibold))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(Color.white)
-                                .cornerRadius(5)
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(Color.white.opacity(0.4))
                         }
                         .buttonStyle(.plain)
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(8)
 
-                    Button(action: {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
-                            isSearching = false
-                            IslandCoordinator.shared.setKeyboardFocus(false)
+                    // Popular 1-Tap Quick City Suggestion Chips
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(["Bengaluru", "Mumbai", "New Delhi", "Hyderabad", "Chennai", "London", "New York", "San Francisco"], id: \.self) { city in
+                                Button(action: {
+                                    searchCityText = city
+                                    submitCitySearch()
+                                }) {
+                                    Text(city)
+                                        .font(.system(size: 9.5, weight: weatherService.cityName == city ? .bold : .regular))
+                                        .foregroundColor(weatherService.cityName == city ? .cyan : Color.white.opacity(0.8))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(weatherService.cityName == city ? Color.cyan.opacity(0.2) : Color.white.opacity(0.08))
+                                        .cornerRadius(6)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color.white.opacity(0.4))
                     }
-                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(8)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 

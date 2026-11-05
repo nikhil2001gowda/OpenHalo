@@ -72,12 +72,19 @@ public final class WeatherService: ObservableObject {
     private var lastFetchTime: Date? = nil
 
     public init() {
-        // Clear old stale "San Francisco" defaults
+        // Clear old stale "San Francisco" or ISP routing gateway names like "Jigani"
         if let savedCity = UserDefaults.standard.string(forKey: userDefaultsCityKey),
            savedCity != "San Francisco" && !savedCity.isEmpty {
-            self.cityName = savedCity
-            self.latitude = UserDefaults.standard.double(forKey: userDefaultsLatKey)
-            self.longitude = UserDefaults.standard.double(forKey: userDefaultsLonKey)
+            if savedCity.lowercased() == "jigani" || savedCity.lowercased().contains("jigani") {
+                self.cityName = "Bengaluru"
+                self.latitude = 12.9716
+                self.longitude = 77.5946
+                saveLocation(name: "Bengaluru", lat: 12.9716, lon: 77.5946)
+            } else {
+                self.cityName = savedCity
+                self.latitude = UserDefaults.standard.double(forKey: userDefaultsLatKey)
+                self.longitude = UserDefaults.standard.double(forKey: userDefaultsLonKey)
+            }
             Task {
                 await fetchWeather()
             }
@@ -137,7 +144,8 @@ public final class WeatherService: ObservableObject {
            let http = response as? HTTPURLResponse, http.statusCode == 200,
            let json = try? JSONDecoder().decode(IPWhoIsResponse.self, from: data),
            json.success == true {
-            let detectedCity = json.city.isEmpty ? "Current Location" : json.city
+            let rawCity = json.city.isEmpty ? "Current Location" : json.city
+            let detectedCity = normalizeCity(city: rawCity, region: json.region, lat: json.latitude, lon: json.longitude)
             self.cityName = detectedCity
             self.latitude = json.latitude
             self.longitude = json.longitude
@@ -151,11 +159,12 @@ public final class WeatherService: ObservableObject {
            let (data, response) = try? await URLSession.shared.data(from: fallbackURL),
            let http = response as? HTTPURLResponse, http.statusCode == 200,
            let json = try? JSONDecoder().decode(FreeIPLocationResponse.self, from: data) {
-            let name = json.cityName.isEmpty ? "Current Location" : json.cityName
-            self.cityName = name
+            let rawCity = json.cityName.isEmpty ? "Current Location" : json.cityName
+            let detectedCity = normalizeCity(city: rawCity, region: nil, lat: json.latitude, lon: json.longitude)
+            self.cityName = detectedCity
             self.latitude = json.latitude
             self.longitude = json.longitude
-            saveLocation(name: name, lat: json.latitude, lon: json.longitude)
+            saveLocation(name: detectedCity, lat: json.latitude, lon: json.longitude)
             await fetchWeather(force: true)
             return
         }
@@ -165,11 +174,12 @@ public final class WeatherService: ObservableObject {
            let (data, response) = try? await URLSession.shared.data(from: bdcURL),
            let http = response as? HTTPURLResponse, http.statusCode == 200,
            let json = try? JSONDecoder().decode(BigDataCloudResponse.self, from: data) {
-            let name = json.city.isEmpty ? (json.locality.isEmpty ? "Current Location" : json.locality) : json.city
-            self.cityName = name
+            let rawCity = json.city.isEmpty ? (json.locality.isEmpty ? "Current Location" : json.locality) : json.city
+            let detectedCity = normalizeCity(city: rawCity, region: nil, lat: json.latitude, lon: json.longitude)
+            self.cityName = detectedCity
             self.latitude = json.latitude
             self.longitude = json.longitude
-            saveLocation(name: name, lat: json.latitude, lon: json.longitude)
+            saveLocation(name: detectedCity, lat: json.latitude, lon: json.longitude)
             await fetchWeather(force: true)
             return
         }
@@ -177,6 +187,37 @@ public final class WeatherService: ObservableObject {
         // 4. Default timezone fallback
         applyTimezoneFallback()
         await fetchWeather(force: true)
+    }
+
+    private func normalizeCity(city: String, region: String?, lat: Double, lon: Double) -> String {
+        let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == "Current Location" {
+            return "Bengaluru"
+        }
+
+        // Bengaluru Metropolitan Area normalization:
+        // ISPs/cellular gateways in South/East Bengaluru often resolve to industrial exchanges like Jigani, Bommasandra, Anekal, Electronic City, Attibele, etc.
+        let isBengaluruBounds = (lat >= 12.70 && lat <= 13.25 && lon >= 77.30 && lon <= 77.85)
+        let bengaluruSuburbs = ["jigani", "bommasandra", "anekal", "attibele", "electronic city", "whitefield", "kengeri", "nelamangala", "yelahanka", "sarjapur", "hosur", "bannerghatta", "hebbal"]
+        if isBengaluruBounds || bengaluruSuburbs.contains(where: { trimmed.lowercased().contains($0) }) {
+            return "Bengaluru"
+        }
+
+        // Mumbai Metropolitan Area normalization
+        let isMumbaiBounds = (lat >= 18.80 && lat <= 19.40 && lon >= 72.70 && lon <= 73.20)
+        let mumbaiSuburbs = ["thane", "navi mumbai", "kalyan", "dombivli", "mira bhayandar", "panvel", "bhiwandi"]
+        if isMumbaiBounds && mumbaiSuburbs.contains(where: { trimmed.lowercased().contains($0) }) {
+            return "Mumbai"
+        }
+
+        // Delhi NCR normalization
+        let isDelhiBounds = (lat >= 28.30 && lat <= 28.95 && lon >= 76.85 && lon <= 77.50)
+        let delhiSuburbs = ["noida", "gurgaon", "gurugram", "faridabad", "ghaziabad"]
+        if isDelhiBounds && delhiSuburbs.contains(where: { trimmed.lowercased().contains($0) }) {
+            return "New Delhi"
+        }
+
+        return trimmed
     }
 
     public func searchAndSetCity(_ query: String) async -> Bool {
@@ -339,6 +380,7 @@ public final class WeatherService: ObservableObject {
 private struct IPWhoIsResponse: Codable {
     let success: Bool
     let city: String
+    let region: String?
     let latitude: Double
     let longitude: Double
 }
