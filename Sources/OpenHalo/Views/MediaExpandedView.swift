@@ -107,7 +107,7 @@ public struct MediaExpandedView: View {
                 Spacer()
 
                 // Playing Waveform
-                if mediaService.currentTrack.isPlaying {
+                if isTrackActive && mediaService.currentTrack.isPlaying {
                     AudioWaveformBarView(isPlaying: true, color: sourceColor(mediaService.currentTrack.source))
                         .padding(.trailing, 4)
                 }
@@ -166,7 +166,7 @@ public struct MediaExpandedView: View {
                                 .fill(Color.white)
                                 .frame(width: 32, height: 32)
 
-                            Image(systemName: mediaService.currentTrack.isPlaying ? "pause.fill" : "play.fill")
+                            Image(systemName: (isTrackActive && mediaService.currentTrack.isPlaying) ? "pause.fill" : "play.fill")
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(.black)
                         }

@@ -207,6 +207,14 @@ public final class MediaService: ObservableObject {
 
     public func togglePlayPause() {
         Task {
+            guard !currentTrack.title.isEmpty && currentTrack.title != "No Media Playing" && currentTrack.title != "Unknown Title" else {
+                // If nothing is playing, launch Music app cleanly without toggling fake playing state
+                if Self.isAppInstalled(bundleID: "com.apple.Music") {
+                    NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Music.app"))
+                }
+                return
+            }
+
             switch currentTrack.source {
             case .appleMusic:
                 if Self.isAppRunning(bundleID: "com.apple.Music") {

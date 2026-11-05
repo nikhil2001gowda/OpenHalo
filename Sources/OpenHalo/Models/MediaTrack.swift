@@ -78,7 +78,9 @@ public struct MediaTrack: Equatable, Sendable {
     }
 
     public var isPlaying: Bool {
-        playbackState == .playing
+        guard playbackState == .playing else { return false }
+        guard !title.isEmpty && title != "No Media Playing" && title != "Unknown Title" else { return false }
+        return true
     }
 
     public var progress: Double {
