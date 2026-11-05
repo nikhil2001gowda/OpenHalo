@@ -1,0 +1,31 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build & Verify macOS App
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+
+      - name: Run Automated Verification Tests
+        run: swift run OpenHaloVerify
+
+      - name: Build Application Bundle
+        run: ./scripts/build_app.sh
+
+      - name: Verify Bundle Existence & Signatures
+        run: |
+          test -f build/OpenHalo.app/Contents/MacOS/OpenHalo
+          test -f build/OpenHalo.app/Contents/Info.plist
+          codesign --verify --verbose build/OpenHalo.app
