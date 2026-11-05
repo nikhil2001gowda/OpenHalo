@@ -93,6 +93,8 @@ public final class IslandWindowController: NSObject, ObservableObject {
             Task { @MainActor in
                 let coordinator = IslandCoordinator.shared
                 if coordinator.state.isExpanded {
+                    // Do not auto-collapse while on Mirror tab so user can freely interact with macOS Video Effects (Center Stage / Studio Light) in menu bar
+                    if coordinator.activeTab == .mirror { return }
                     coordinator.collapseToCompact()
                 }
             }
@@ -107,6 +109,9 @@ public final class IslandWindowController: NSObject, ObservableObject {
                 let coordinator = IslandCoordinator.shared
 
                 if coordinator.state.isExpanded {
+                    // Do not auto-collapse while on Mirror tab so user can freely interact with macOS Video Effects (Center Stage / Studio Light) in menu bar
+                    if coordinator.activeTab == .mirror { return }
+
                     let mouseLocation = NSEvent.mouseLocation
                     let currentWidth = coordinator.currentIslandWidth
                     let currentHeight = coordinator.currentIslandHeight
@@ -132,6 +137,8 @@ public final class IslandWindowController: NSObject, ObservableObject {
             Task { @MainActor in
                 let coordinator = IslandCoordinator.shared
                 if coordinator.state.isExpanded {
+                    // Do not auto-collapse while on Mirror tab so user can freely interact with macOS Video Effects (Center Stage / Studio Light) in menu bar
+                    if coordinator.activeTab == .mirror { return }
                     coordinator.collapseToCompact()
                 }
             }

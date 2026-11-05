@@ -60,9 +60,9 @@ public struct MirrorExpandedView: View {
                                 .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
                         )
 
-                    // Mirror indicator badge
+                    // Mirror indicator badge & macOS Video Effects Controls
                     VStack {
-                        HStack {
+                        HStack(spacing: 6) {
                             HStack(spacing: 5) {
                                 Circle()
                                     .fill(Color.green)
@@ -77,6 +77,48 @@ public struct MirrorExpandedView: View {
                             .clipShape(Capsule())
 
                             Spacer()
+
+                            // macOS System Video Effects Menu Bar Popover Trigger
+                            Button(action: {
+                                mirrorService.openSystemVideoEffects()
+                            }) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "sparkles.tv")
+                                        .font(.system(size: 9))
+                                    Text("Video Effects")
+                                        .font(.system(size: 9, weight: .semibold))
+                                }
+                                .foregroundColor(.yellow)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.black.opacity(0.7))
+                                .clipShape(Capsule())
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .pointingHandCursor()
+                            .help("Configure macOS Center Stage, Studio Light, Portrait & Reactions")
+
+                            // Direct Center Stage Toggle
+                            Button(action: {
+                                mirrorService.toggleCenterStage()
+                            }) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "person.crop.circle.badge.checkmark")
+                                        .font(.system(size: 9))
+                                    Text(mirrorService.isCenterStageActive ? "Center Stage On" : "Center Stage")
+                                        .font(.system(size: 9, weight: mirrorService.isCenterStageActive ? .bold : .regular))
+                                }
+                                .foregroundColor(mirrorService.isCenterStageActive ? .blue : Color.white.opacity(0.8))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(mirrorService.isCenterStageActive ? Color.blue.opacity(0.3) : Color.black.opacity(0.65))
+                                .clipShape(Capsule())
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .pointingHandCursor()
+                            .help("Toggle macOS Center Stage auto-framing")
 
                             // On-Device Vision Presence Trigger
                             Button(action: {
@@ -93,38 +135,70 @@ public struct MirrorExpandedView: View {
                                 .padding(.vertical, 3)
                                 .background(Color.black.opacity(0.65))
                                 .clipShape(Capsule())
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .pointingHandCursor()
                         }
-                        .padding(8)
+                        .padding(6)
 
                         Spacer()
 
-                        // Vision Result Toast
-                        if presenceService.isUserPresent || presenceService.facesDetectedCount > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.shield.fill")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(.green)
-                                Text(presenceService.statusMessage)
-                                    .font(.system(size: 9.5, weight: .medium))
-                                    .foregroundColor(.white)
+                        // Active Video Effects Indicators & Vision Result Toast
+                        HStack(spacing: 6) {
+                            if mirrorService.isStudioLightActive {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "light.beacon.max.fill")
+                                        .font(.system(size: 8))
+                                    Text("Studio Light")
+                                        .font(.system(size: 8.5, weight: .medium))
+                                }
+                                .foregroundColor(.yellow)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.black.opacity(0.75))
+                                .cornerRadius(5)
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.black.opacity(0.75))
-                            .cornerRadius(6)
-                            .padding(.bottom, 6)
+
+                            if mirrorService.isPortraitActive {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "f.cursive")
+                                        .font(.system(size: 8))
+                                    Text("Portrait")
+                                        .font(.system(size: 8.5, weight: .medium))
+                                }
+                                .foregroundColor(.purple)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.black.opacity(0.75))
+                                .cornerRadius(5)
+                            }
+
+                            if presenceService.isUserPresent || presenceService.facesDetectedCount > 0 {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.shield.fill")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.green)
+                                    Text(presenceService.statusMessage)
+                                        .font(.system(size: 8.5, weight: .medium))
+                                        .foregroundColor(.white)
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.black.opacity(0.75))
+                                .cornerRadius(5)
+                            }
                         }
+                        .padding(.bottom, 6)
                     }
                 }
-                .frame(width: 280, height: 130)
+                .frame(width: 320, height: 140)
 
                 // Bottom Camera Selector
                 HStack {
-                    Text("Looking Good ✨")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.7))
+                    Text("Looking Good ✨ (Mirror Locked Open)")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.6))
 
                     Spacer()
 
@@ -135,14 +209,20 @@ public struct MirrorExpandedView: View {
                             }
                         }
                         .labelsHidden()
-                        .frame(width: 130)
+                        .frame(width: 140)
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 14)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+        .onAppear {
+            mirrorService.startSession()
+        }
+        .onDisappear {
+            mirrorService.stopSession()
+        }
     }
 }
 
@@ -158,6 +238,10 @@ struct CameraPreviewRepresentable: NSViewRepresentable {
 
     func updateNSView(_ nsView: CameraPreviewNSView, context: Context) {
         nsView.videoPreviewLayer.session = session
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        nsView.videoPreviewLayer.frame = nsView.bounds
+        CATransaction.commit()
     }
 }
 
@@ -181,6 +265,15 @@ class CameraPreviewNSView: NSView {
 
     override func makeBackingLayer() -> CALayer {
         let layer = AVCaptureVideoPreviewLayer()
+        layer.videoGravity = .resizeAspectFill
         return layer
+    }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        videoPreviewLayer.frame = bounds
+        CATransaction.commit()
     }
 }
