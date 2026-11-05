@@ -4,7 +4,7 @@ public struct AudioWaveformBarView: View {
     public var isPlaying: Bool
     public var color: Color
 
-    @State private var barHeights: [CGFloat] = [0.3, 0.7, 1.0, 0.5]
+    @State private var barHeights: [CGFloat] = [0.35, 0.75, 1.0, 0.55]
     @State private var timer: Timer?
 
     public init(isPlaying: Bool, color: Color = Color(red: 0.19, green: 0.82, blue: 0.35)) {
@@ -13,27 +13,31 @@ public struct AudioWaveformBarView: View {
     }
 
     public var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 2.5) {
             ForEach(0..<4, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 1)
+                Capsule()
                     .fill(color)
-                    .frame(width: 2.5, height: isPlaying ? max(barHeights[index] * 12, 3) : 3)
+                    .frame(width: 2.8, height: isPlaying ? max(barHeights[index] * 13, 3.5) : 3.5)
             }
         }
-        .frame(height: 12)
+        .frame(height: 14)
         .onAppear {
             updateAnimationState()
         }
         .onChange(of: isPlaying) {
             updateAnimationState()
         }
+        .onDisappear {
+            timer?.invalidate()
+            timer = nil
+        }
     }
 
     private func updateAnimationState() {
         timer?.invalidate()
         if isPlaying {
-            timer = Timer.scheduledTimer(withTimeInterval: 0.18, repeats: true) { _ in
-                withAnimation(.easeInOut(duration: 0.15)) {
+            timer = Timer.scheduledTimer(withTimeInterval: 0.16, repeats: true) { _ in
+                withAnimation(.easeInOut(duration: 0.14)) {
                     barHeights = (0..<4).map { _ in CGFloat.random(in: 0.25...1.0) }
                 }
             }
@@ -44,3 +48,4 @@ public struct AudioWaveformBarView: View {
         }
     }
 }
+
