@@ -39,10 +39,10 @@ public struct WeatherSnapshot: Sendable, Codable, Equatable {
     }
 
     public static let placeholder = WeatherSnapshot(
-        temperature: 20.0,
-        apparentTemperature: 20.0,
-        humidity: 50,
-        windSpeed: 10.0,
+        temperature: 22.0,
+        apparentTemperature: 24.0,
+        humidity: 60,
+        windSpeed: 8.0,
         weatherCode: 0,
         isDay: true,
         conditionDescription: "Clear",
@@ -58,25 +58,121 @@ public final class WeatherService: ObservableObject {
     @Published public var current: WeatherSnapshot? = nil
     @Published public var isLoading: Bool = false
     @Published public var errorMessage: String? = nil
-    @Published public var cityName: String = "San Francisco"
+    @Published public var cityName: String = "Locating..."
 
-    // Default coordinates (User customizable)
-    @Published public var latitude: Double = 37.7749
-    @Published public var longitude: Double = -122.4194
+    // User coordinates (auto-detected via IP, or set via city search)
+    @Published public var latitude: Double = 12.9716
+    @Published public var longitude: Double = 77.5946
+
+    private let userDefaultsCityKey = "openhalo.weather.cityName"
+    private let userDefaultsLatKey = "openhalo.weather.latitude"
+    private let userDefaultsLonKey = "openhalo.weather.longitude"
 
     private let cacheTTL: TimeInterval = 1200 // 20 minutes
     private var lastFetchTime: Date? = nil
 
     public init() {
-        Task {
-            await fetchWeather()
+        if let savedCity = UserDefaults.standard.string(forKey: userDefaultsCityKey),
+           savedCity != "San Francisco" && !savedCity.isEmpty {
+            self.cityName = savedCity
+            self.latitude = UserDefaults.standard.double(forKey: userDefaultsLatKey)
+            self.longitude = UserDefaults.standard.double(forKey: userDefaultsLonKey)
+            Task {
+                await fetchWeather()
+            }
+        } else {
+            Task {
+                await autoDetectLocation()
+            }
         }
+    }
+
+    public func autoDetectLocation() async {
+        isLoading = true
+        errorMessage = nil
+
+        // 1. Primary: ip-api.com
+        if let url = URL(string: "http://ip-api.com/json/"),
+           let (data, response) = try? await URLSession.shared.data(from: url),
+           let http = response as? HTTPURLResponse, http.statusCode == 200,
+           let json = try? JSONDecoder().decode(IPLocationResponse.self, from: data),
+           json.status.lowercased() == "success" {
+            self.cityName = json.city
+            self.latitude = json.lat
+            self.longitude = json.lon
+            saveLocation(name: json.city, lat: json.lat, lon: json.lon)
+            await fetchWeather(force: true)
+            return
+        }
+
+        // 2. Fallback: freeipapi.com
+        if let fallbackURL = URL(string: "https://freeipapi.com/api/json"),
+           let (data, response) = try? await URLSession.shared.data(from: fallbackURL),
+           let http = response as? HTTPURLResponse, http.statusCode == 200,
+           let json = try? JSONDecoder().decode(FreeIPLocationResponse.self, from: data) {
+            let name = json.cityName.isEmpty ? "Current Location" : json.cityName
+            self.cityName = name
+            self.latitude = json.latitude
+            self.longitude = json.longitude
+            saveLocation(name: name, lat: json.latitude, lon: json.longitude)
+            await fetchWeather(force: true)
+            return
+        }
+
+        // 3. Fallback to existing or Bengaluru
+        if self.cityName == "Locating..." {
+            self.cityName = "Bengaluru"
+            self.latitude = 12.9716
+            self.longitude = 77.5946
+        }
+        await fetchWeather(force: true)
+    }
+
+    public func searchAndSetCity(_ query: String) async -> Bool {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://geocoding-api.open-meteo.com/v1/search?name=\(encoded)&count=1&language=en&format=json") else {
+            return false
+        }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                isLoading = false
+                return false
+            }
+
+            let geo = try JSONDecoder().decode(OpenMeteoGeoResponse.self, from: data)
+            if let first = geo.results?.first {
+                self.cityName = first.name
+                self.latitude = first.latitude
+                self.longitude = first.longitude
+                saveLocation(name: first.name, lat: first.latitude, lon: first.longitude)
+                await fetchWeather(force: true)
+                return true
+            }
+        } catch {
+            self.errorMessage = "City not found"
+            self.isLoading = false
+        }
+        return false
+    }
+
+    private func saveLocation(name: String, lat: Double, lon: Double) {
+        UserDefaults.standard.set(name, forKey: userDefaultsCityKey)
+        UserDefaults.standard.set(lat, forKey: userDefaultsLatKey)
+        UserDefaults.standard.set(lon, forKey: userDefaultsLonKey)
     }
 
     public func setLocation(name: String, lat: Double, lon: Double) {
         self.cityName = name
         self.latitude = lat
         self.longitude = lon
+        saveLocation(name: name, lat: lat, lon: lon)
         self.lastFetchTime = nil
         Task {
             await fetchWeather(force: true)
@@ -140,7 +236,6 @@ public final class WeatherService: ObservableObject {
         } catch {
             self.isLoading = false
             self.errorMessage = error.localizedDescription
-            // If offline, provide a sensible fallback if empty
             if self.current == nil {
                 self.current = WeatherSnapshot.placeholder
             }
@@ -189,7 +284,30 @@ public final class WeatherService: ObservableObject {
     }
 }
 
-// Internal Open-Meteo JSON schema
+// Schemas
+private struct IPLocationResponse: Codable {
+    let status: String
+    let city: String
+    let lat: Double
+    let lon: Double
+}
+
+private struct FreeIPLocationResponse: Codable {
+    let cityName: String
+    let latitude: Double
+    let longitude: Double
+}
+
+private struct OpenMeteoGeoResponse: Codable {
+    let results: [GeoCityResult]?
+}
+
+private struct GeoCityResult: Codable {
+    let name: String
+    let latitude: Double
+    let longitude: Double
+}
+
 private struct OpenMeteoResponse: Codable {
     let current: CurrentUnits
 }
