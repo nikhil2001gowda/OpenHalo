@@ -37,44 +37,51 @@ public struct MediaExpandedView: View {
                         .lineLimit(1)
 
                     if mediaService.currentTrack.title.isEmpty {
-                        HStack(spacing: 6) {
-                            Button(action: {
-                                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Music.app"))
-                            }) {
-                                HStack(spacing: 3) {
-                                    Image(systemName: "apple.logo")
-                                        .font(.system(size: 9))
-                                    Text("Music")
-                                        .font(.system(size: 9, weight: .semibold))
-                                }
-                                .foregroundColor(.pink)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.pink.opacity(0.2))
-                                .cornerRadius(5)
-                            }
-                            .buttonStyle(.plain)
+                        Text("Auto-detects any media app when playing")
+                            .font(.system(size: 10, weight: .regular))
+                            .foregroundColor(Color.white.opacity(0.6))
+                            .lineLimit(1)
 
-                            Button(action: {
-                                if let spotifyURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.spotify.client") {
-                                    NSWorkspace.shared.open(spotifyURL)
-                                } else {
-                                    NSWorkspace.shared.open(URL(string: "https://open.spotify.com")!)
+                        HStack(spacing: 6) {
+                            if MediaService.isAppInstalled(bundleID: "com.apple.Music") {
+                                Button(action: {
+                                    NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Music.app"))
+                                }) {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "apple.logo")
+                                            .font(.system(size: 9))
+                                        Text("Open Music")
+                                            .font(.system(size: 9, weight: .semibold))
+                                    }
+                                    .foregroundColor(.pink)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(Color.pink.opacity(0.2))
+                                    .cornerRadius(5)
                                 }
-                            }) {
-                                HStack(spacing: 3) {
-                                    Image(systemName: "music.note")
-                                        .font(.system(size: 9))
-                                    Text("Spotify")
-                                        .font(.system(size: 9, weight: .semibold))
-                                }
-                                .foregroundColor(.green)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.green.opacity(0.2))
-                                .cornerRadius(5)
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
+
+                            if MediaService.isAppInstalled(bundleID: "com.spotify.client") {
+                                Button(action: {
+                                    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.spotify.client") {
+                                        NSWorkspace.shared.open(url)
+                                    }
+                                }) {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "music.note")
+                                            .font(.system(size: 9))
+                                        Text("Open Spotify")
+                                            .font(.system(size: 9, weight: .semibold))
+                                    }
+                                    .foregroundColor(.green)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(Color.green.opacity(0.2))
+                                    .cornerRadius(5)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                         .padding(.top, 2)
                     } else {

@@ -113,3 +113,4 @@ echo "🚀 Launching ${TARGET_APP}..."
 open "${TARGET_APP}"
 
 echo "✨ OpenHalo is now live on your Mac!"
+

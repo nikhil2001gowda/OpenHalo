@@ -10,6 +10,14 @@ public final class MediaService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var progressTimer: Timer?
 
+    public static func isAppRunning(bundleID: String) -> Bool {
+        return !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
+    }
+
+    public static func isAppInstalled(bundleID: String) -> Bool {
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil
+    }
+
     public init() {
         setupDistributedNotificationObservers()
         checkActivePlayers()
@@ -26,7 +34,7 @@ public final class MediaService: ObservableObject {
             object: nil
         )
 
-        // Spotify notification
+        // Spotify notification (auto-listens, will trigger automatically if user installs/runs Spotify)
         center.addObserver(
             self,
             selector: #selector(handleSpotifyNotification(_:)),
@@ -105,13 +113,21 @@ public final class MediaService: ObservableObject {
     }
 
     public func togglePlayPause() {
-        let source = currentTrack.source
         Task {
-            if source == .spotify {
-                await AppleScriptRunner.run("tell application \"Spotify\" to playpause")
-            } else {
-                await AppleScriptRunner.run("tell application \"Music\" to playpause")
+            let isSpotifyRunning = Self.isAppRunning(bundleID: "com.spotify.client")
+            let isMusicRunning = Self.isAppRunning(bundleID: "com.apple.Music")
+
+            if currentTrack.source == .spotify && isSpotifyRunning {
+                await AppleScriptRunner.run("tell application id \"com.spotify.client\" to playpause")
+            } else if isMusicRunning {
+                await AppleScriptRunner.run("tell application id \"com.apple.Music\" to playpause")
+            } else if isSpotifyRunning {
+                await AppleScriptRunner.run("tell application id \"com.spotify.client\" to playpause")
+            } else if Self.isAppInstalled(bundleID: "com.apple.Music") {
+                // If neither is running, launch built-in Music cleanly via NSWorkspace (never prompts!)
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Music.app"))
             }
+
             // Toggle local optimistic state
             currentTrack.playbackState = (currentTrack.playbackState == .playing) ? .paused : .playing
             updateProgressTimer()
@@ -119,23 +135,21 @@ public final class MediaService: ObservableObject {
     }
 
     public func nextTrack() {
-        let source = currentTrack.source
         Task {
-            if source == .spotify {
-                await AppleScriptRunner.run("tell application \"Spotify\" to next track")
-            } else {
-                await AppleScriptRunner.run("tell application \"Music\" to next track")
+            if currentTrack.source == .spotify && Self.isAppRunning(bundleID: "com.spotify.client") {
+                await AppleScriptRunner.run("tell application id \"com.spotify.client\" to next track")
+            } else if Self.isAppRunning(bundleID: "com.apple.Music") {
+                await AppleScriptRunner.run("tell application id \"com.apple.Music\" to next track")
             }
         }
     }
 
     public func previousTrack() {
-        let source = currentTrack.source
         Task {
-            if source == .spotify {
-                await AppleScriptRunner.run("tell application \"Spotify\" to previous track")
-            } else {
-                await AppleScriptRunner.run("tell application \"Music\" to previous track")
+            if currentTrack.source == .spotify && Self.isAppRunning(bundleID: "com.spotify.client") {
+                await AppleScriptRunner.run("tell application id \"com.spotify.client\" to previous track")
+            } else if Self.isAppRunning(bundleID: "com.apple.Music") {
+                await AppleScriptRunner.run("tell application id \"com.apple.Music\" to previous track")
             }
         }
     }
@@ -143,64 +157,82 @@ public final class MediaService: ObservableObject {
     public func seek(to progressRatio: Double) {
         let targetSeconds = currentTrack.duration * progressRatio
         currentTrack.position = targetSeconds
-        let source = currentTrack.source
         Task {
-            if source == .spotify {
-                await AppleScriptRunner.run("tell application \"Spotify\" to set player position to \(targetSeconds)")
-            } else {
-                await AppleScriptRunner.run("tell application \"Music\" to set player position to \(targetSeconds)")
+            if currentTrack.source == .spotify && Self.isAppRunning(bundleID: "com.spotify.client") {
+                await AppleScriptRunner.run("tell application id \"com.spotify.client\" to set player position to \(targetSeconds)")
+            } else if Self.isAppRunning(bundleID: "com.apple.Music") {
+                await AppleScriptRunner.run("tell application id \"com.apple.Music\" to set player position to \(targetSeconds)")
             }
         }
     }
 
     private func checkActivePlayers() {
         Task {
-            let script = """
-            if application "Music" is running then
-                tell application "Music"
+            // ONLY query applications that are currently active in process table
+            // This guarantees macOS NEVER pops up a "Where is <App>?" dialog
+            let isMusicRunning = Self.isAppRunning(bundleID: "com.apple.Music")
+            let isSpotifyRunning = Self.isAppRunning(bundleID: "com.spotify.client")
+
+            if isMusicRunning {
+                let script = """
+                tell application id "com.apple.Music"
                     if player state is playing then
                         return "Music|playing|" & (name of current track) & "|" & (artist of current track) & "|" & (duration of current track) & "|" & (player position)
                     end if
                 end tell
-            end if
-            if application "Spotify" is running then
-                tell application "Spotify"
+                return "none"
+                """
+                if let output = await AppleScriptRunner.run(script), output != "none" {
+                    self.parseAndSetTrack(output: output)
+                    return
+                }
+            }
+
+            if isSpotifyRunning {
+                let script = """
+                tell application id "com.spotify.client"
                     if player state is playing then
                         return "Spotify|playing|" & (name of current track) & "|" & (artist of current track) & "|" & ((duration of current track) / 1000) & "|" & (player position)
                     end if
                 end tell
-            end if
-            return "none"
-            """
-            if let output = await AppleScriptRunner.run(script), output != "none" {
-                let parts = output.components(separatedBy: "|")
-                if parts.count >= 6 {
-                    let source: MusicSource = (parts[0] == "Spotify") ? .spotify : .appleMusic
-                    let title = parts[2]
-                    let artist = parts[3]
-                    let duration = Double(parts[4]) ?? 0
-                    let position = Double(parts[5]) ?? 0
-
-                    self.currentTrack = MediaTrack(
-                        title: title,
-                        artist: artist,
-                        album: "",
-                        duration: duration,
-                        position: position,
-                        playbackState: .playing,
-                        source: source
-                    )
-                    self.isAvailable = true
-                    self.updateProgressTimer()
+                return "none"
+                """
+                if let output = await AppleScriptRunner.run(script), output != "none" {
+                    self.parseAndSetTrack(output: output)
+                    return
                 }
             }
         }
     }
 
+    private func parseAndSetTrack(output: String) {
+        let parts = output.components(separatedBy: "|")
+        if parts.count >= 6 {
+            let source: MusicSource = (parts[0] == "Spotify") ? .spotify : .appleMusic
+            let title = parts[2]
+            let artist = parts[3]
+            let duration = Double(parts[4]) ?? 0
+            let position = Double(parts[5]) ?? 0
+
+            self.currentTrack = MediaTrack(
+                title: title,
+                artist: artist,
+                album: "",
+                duration: duration,
+                position: position,
+                playbackState: .playing,
+                source: source
+            )
+            self.isAvailable = true
+            self.updateProgressTimer()
+        }
+    }
+
     private func fetchAppleMusicArtwork() {
+        guard Self.isAppRunning(bundleID: "com.apple.Music") else { return }
         Task {
             let script = """
-            tell application "Music"
+            tell application id "com.apple.Music"
                 if player state is playing then
                     try
                         set rawData to raw data of artwork 1 of current track
@@ -214,4 +246,3 @@ public final class MediaService: ObservableObject {
         }
     }
 }
-
