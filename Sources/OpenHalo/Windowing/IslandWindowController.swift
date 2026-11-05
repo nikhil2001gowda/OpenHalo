@@ -7,15 +7,20 @@ public final class IslandWindowController: NSObject, ObservableObject {
 
     public private(set) var panel: IslandPanel?
     private var screenChangeObserver: Any?
+    private var clickOutsideMonitor: Any?
 
     public override init() {
         super.init()
         setupScreenChangeObserver()
+        setupGlobalClickOutsideMonitor()
     }
 
     deinit {
         if let observer = screenChangeObserver {
             NotificationCenter.default.removeObserver(observer)
+        }
+        if let monitor = clickOutsideMonitor {
+            NSEvent.removeMonitor(monitor)
         }
     }
 
@@ -71,13 +76,40 @@ public final class IslandWindowController: NSObject, ObservableObject {
             self?.reposition()
         }
     }
+
+    private func setupGlobalClickOutsideMonitor() {
+        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] event in
+            Task { @MainActor [weak self] in
+                guard let self = self, let panel = self.panel else { return }
+                let coordinator = IslandCoordinator.shared
+
+                // Only dismiss when expanded
+                guard coordinator.state.isExpanded else { return }
+
+                let mouseLocation = NSEvent.mouseLocation
+                let currentWidth = coordinator.currentIslandWidth
+                let currentHeight = coordinator.currentIslandHeight
+
+                let minX = panel.frame.midX - (currentWidth / 2.0)
+                let minY = panel.frame.maxY - currentHeight
+                let islandScreenRect = NSRect(x: minX, y: minY, width: currentWidth, height: currentHeight)
+
+                if !islandScreenRect.contains(mouseLocation) {
+                    coordinator.collapseToCompact()
+                }
+            }
+        }
+    }
 }
 
 /// Custom hosting view that allows mouse events to pass through transparent regions outside the visible island
 final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
     override func hitTest(_ point: NSPoint) -> NSView? {
-        let currentWidth = IslandCoordinator.shared.currentIslandWidth
-        let currentHeight = IslandCoordinator.shared.currentIslandHeight
+        let coordinator = IslandCoordinator.shared
+        let currentWidth = coordinator.currentIslandWidth
+        let currentHeight = coordinator.currentIslandHeight
 
         let minX = (bounds.width - currentWidth) / 2.0
         let minY = bounds.height - currentHeight
@@ -89,8 +121,14 @@ final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
             return super.hitTest(point)
         }
 
-        // If clicking on empty background margins outside the island, pass clicks through to apps underneath
+        // If clicking on empty background margins outside the island while expanded, collapse to compact!
+        if coordinator.state.isExpanded {
+            Task { @MainActor in
+                coordinator.collapseToCompact()
+            }
+        }
+
+        // Pass clicks through to apps underneath
         return nil
     }
 }
-
