@@ -63,11 +63,21 @@ public final class IslandCoordinator: ObservableObject {
 
     // MARK: - Dynamic Capsule Dimensions
 
+    public var hasActiveLiveActivity: Bool {
+        if timerService.isRunning { return true }
+        if mediaService.currentTrack.isPlaying { return true }
+        if let next = calendarService.nextEvent, next.isOngoing { return true }
+        return false
+    }
+
     public var currentIslandWidth: CGFloat {
         if isDropHovered { return 460 }
         if state.isExpanded { return 430 }
         if case .hud = state { return 230 }
-        return 204
+        if hasActiveLiveActivity {
+            return ScreenNotchDetector.detect().hasNotch ? 385 : 340
+        }
+        return ScreenNotchDetector.detect().hasNotch ? 220 : 204
     }
 
     public var currentIslandHeight: CGFloat {
@@ -100,6 +110,33 @@ public final class IslandCoordinator: ObservableObject {
     }
 
     private func setupSubscriptions() {
+        // Media track updates trigger Live Activity pill resizing
+        mediaService.$currentTrack
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        // Timer state updates trigger Live Activity pill resizing
+        timerService.$isRunning
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        timerService.$remainingSeconds
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        // Calendar updates
+        calendarService.$nextEvent
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
         // Observe timer finish alert
         timerService.$isFinishedAlert
             .dropFirst()

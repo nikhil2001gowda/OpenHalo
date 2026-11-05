@@ -92,14 +92,14 @@ public struct CompactPillView: View {
 
     private var nowPlayingLeading: some View {
         HStack(spacing: 6) {
-            Image(systemName: coordinator.mediaService.currentTrack.source == .spotify ? "music.note" : "apple.logo")
+            Image(systemName: coordinator.mediaService.currentTrack.source.iconName)
                 .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.green)
+                .foregroundColor(sourceColor(coordinator.mediaService.currentTrack.source))
             Text(coordinator.mediaService.currentTrack.title.isEmpty ? "Now Playing" : coordinator.mediaService.currentTrack.title)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .frame(maxWidth: 85, alignment: .leading)
+                .frame(maxWidth: 105, alignment: .leading)
         }
     }
 
@@ -148,8 +148,11 @@ public struct CompactPillView: View {
 
     @ViewBuilder
     private var smartTrailingContent: some View {
-        if coordinator.mediaService.currentTrack.isPlaying {
-            AudioWaveformBarView(isPlaying: true, color: .green)
+        if coordinator.timerService.isRunning {
+            CircularProgressRing(progress: coordinator.timerService.progress, lineWidth: 2, primaryColor: .orange)
+                .frame(width: 14, height: 14)
+        } else if coordinator.mediaService.currentTrack.isPlaying {
+            AudioWaveformBarView(isPlaying: true, color: sourceColor(coordinator.mediaService.currentTrack.source))
         } else if coordinator.batteryService.hasBattery && coordinator.batteryService.isCharging {
             Image(systemName: "bolt.fill")
                 .font(.system(size: 10, weight: .bold))
@@ -230,6 +233,20 @@ public struct CompactPillView: View {
             Text(coordinator.weatherService.current?.formattedTemp ?? "--°")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(.white)
+        }
+    }
+
+    private func sourceColor(_ source: MusicSource) -> Color {
+        switch source {
+        case .appleMusic: return .pink
+        case .spotify: return .green
+        case .youtube: return .red
+        case .chrome: return .blue
+        case .safari: return .blue
+        case .webMedia: return .cyan
+        case .quickTime: return .blue
+        case .vlc: return .orange
+        case .system: return .white
         }
     }
 }

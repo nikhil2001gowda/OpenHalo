@@ -44,6 +44,8 @@ public struct IslandRootView: View {
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.state.isExpanded)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.state.isHUD)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.activeTab)
+            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.hasActiveLiveActivity)
+            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.currentIslandWidth)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: isDropTargeted)
             .onHover { hovering in
                 coordinator.setHovering(hovering)
