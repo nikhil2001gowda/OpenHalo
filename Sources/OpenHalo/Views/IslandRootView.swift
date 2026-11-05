@@ -15,6 +15,7 @@ public struct IslandRootView: View {
         if isDropTargeted { return true }
         if coordinator.state.isExpanded { return true }
         if case .hud = coordinator.state { return true }
+        if case .faceID = coordinator.state { return true }
         // On notched screens when idle without active live activity: NO BORDER! Seamlessly blends into hardware notch
         if hasNotch && !coordinator.hasActiveLiveActivity {
             return false
@@ -44,6 +45,9 @@ public struct IslandRootView: View {
                             .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     } else if case .hud(let payload) = coordinator.state {
                         MediaMateHUDView(payload: payload)
+                            .transition(.opacity)
+                    } else if case .faceID(let isScanning, let isUnlocked) = coordinator.state {
+                        FaceIDNotchView(isScanning: isScanning, isUnlocked: isUnlocked)
                             .transition(.opacity)
                     } else {
                         CompactPillView()
@@ -87,6 +91,9 @@ public struct IslandRootView: View {
             return 24
         }
         if case .hud = coordinator.state {
+            return 18
+        }
+        if case .faceID = coordinator.state {
             return 18
         }
         return hasNotch ? 12 : 17

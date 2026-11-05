@@ -78,6 +78,9 @@ public final class IslandCoordinator: ObservableObject {
         if case .hud = state {
             return hasNotch ? 385 : 240
         }
+        if case .faceID = state {
+            return hasNotch ? 385 : 300
+        }
         if hasActiveLiveActivity {
             return hasNotch ? 385 : 340
         }
@@ -205,6 +208,26 @@ public final class IslandCoordinator: ObservableObject {
         }
         hudDismissWorkItem = item
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: item)
+    }
+
+    public func showFaceIDScan(isScanning: Bool, isUnlocked: Bool) {
+        hudDismissWorkItem?.cancel()
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+            self.state = .faceID(isScanning: isScanning, isUnlocked: isUnlocked)
+        }
+
+        if isUnlocked {
+            let item = DispatchWorkItem { [weak self] in
+                guard let self = self else { return }
+                if case .faceID = self.state {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+                        self.state = .compact
+                    }
+                }
+            }
+            hudDismissWorkItem = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: item)
+        }
     }
 
     public func setKeyboardFocus(_ focus: Bool) {

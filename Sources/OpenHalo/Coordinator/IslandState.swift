@@ -54,6 +54,7 @@ public enum ExpandedTab: String, CaseIterable, Identifiable, Sendable {
 public enum IslandPresentationState: Equatable, Sendable {
     case compact
     case hud(HUDPayload)
+    case faceID(isScanning: Bool, isUnlocked: Bool)
     case mediumStatus(title: String, subtitle: String, icon: String, accentColor: Color)
     case expanded(ExpandedTab)
     case shelfDropZone
@@ -66,6 +67,7 @@ public enum IslandPresentationState: Equatable, Sendable {
 
     public var isHUD: Bool {
         if case .hud = self { return true }
+        if case .faceID = self { return true }
         return false
     }
 
@@ -75,6 +77,8 @@ public enum IslandPresentationState: Equatable, Sendable {
             return true
         case let (.hud(h1), .hud(h2)):
             return h1.type == h2.type && abs(h1.value - h2.value) < 0.01 && h1.isMuted == h2.isMuted
+        case let (.faceID(s1, u1), .faceID(s2, u2)):
+            return s1 == s2 && u1 == u2
         case let (.mediumStatus(t1, s1, i1, _), .mediumStatus(t2, s2, i2, _)):
             return t1 == t2 && s1 == s2 && i1 == i2
         case let (.expanded(tab1), .expanded(tab2)):

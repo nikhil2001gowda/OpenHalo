@@ -2,6 +2,7 @@ import Foundation
 @preconcurrency import AVFoundation
 import Vision
 import AppKit
+import SwiftUI
 
 public enum ScreenLockFaceState: Equatable, Sendable {
     case idle
@@ -108,6 +109,9 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         self.state = .scanning(remainingSeconds: 5.0)
         self.statusMessage = "Scanning Face (5s limit)..."
 
+        // Show Dynamic Island scanning animation
+        IslandCoordinator.shared.showFaceIDScan(isScanning: true, isUnlocked: false)
+
         // Arm strict 5.0-second hardware watchdog
         watchdogTimer?.cancel()
         let watchdog = DispatchWorkItem { [weak self] in
@@ -117,6 +121,9 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
                     self.stopAndCleanup()
                     self.state = .timedOut
                     self.statusMessage = "Scan timed out (5s limit reached). Camera Off."
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+                        IslandCoordinator.shared.state = .compact
+                    }
                 }
             }
         }
@@ -296,6 +303,16 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         self.statusMessage = "Face Recognized (\(Int(confidence * 100))%)! Camera Off."
 
         SoundEffectManager.playActionBeep()
+
+        // 1. Trigger Dynamic Island Face ID Unlock Animation
+        IslandCoordinator.shared.showFaceIDScan(isScanning: false, isUnlocked: true)
+
+        // 2. If password is saved in Keychain, inject hardware keystrokes to unlock macOS
+        if let password = KeychainHelper.getPassword(), !password.isEmpty {
+            DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.25) {
+                KeychainHelper.unlockLockScreen(password: password)
+            }
+        }
     }
 
     private func compareRatios(_ a: [Float], _ b: [Float]) -> Float {

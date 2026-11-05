@@ -26,6 +26,9 @@ mkdir -p "${RESOURCES_DIR}"
 
 cp "${PROJECT_DIR}/.build/release/OpenHalo" "${MACOS_DIR}/OpenHalo"
 chmod +x "${MACOS_DIR}/OpenHalo"
+if [ -f "${PROJECT_DIR}/Resources/AppIcon.icns" ]; then
+    cp "${PROJECT_DIR}/Resources/AppIcon.icns" "${RESOURCES_DIR}/AppIcon.icns"
+fi
 
 cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -36,6 +39,8 @@ cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
     <string>en</string>
     <key>CFBundleExecutable</key>
     <string>OpenHalo</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.openhalo.app</string>
     <key>CFBundleInfoDictionaryVersion</key>

@@ -9,6 +9,9 @@ public struct SettingsView: View {
     @ObservedObject var weatherService = WeatherService.shared
 
     @State private var isShowingEnrollmentSheet: Bool = false
+    @State private var macPassword: String = ""
+    @State private var hasStoredPassword: Bool = KeychainHelper.hasPassword()
+    @State private var passwordStatusMessage: String? = nil
 
     public init() {}
 
@@ -17,9 +20,7 @@ public struct SettingsView: View {
             VStack(alignment: .leading, spacing: 18) {
                 // Header
                 HStack(spacing: 12) {
-                    Image(systemName: "circle.hexagongrid.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(.cyan)
+                    GlassyHaloLogoView(size: 34)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("OpenHalo Preferences")
@@ -113,6 +114,77 @@ public struct SettingsView: View {
                                 .foregroundColor(.green)
                         }
                     }
+
+                    // Auto-Unlock Password via Secure Keychain
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Mac Auto-Unlock Login Password (Glance Architecture):")
+                            .font(.system(size: 11, weight: .medium))
+
+                        HStack(spacing: 8) {
+                            SecureField(hasStoredPassword ? "•••••••••••• (Saved)" : "Enter macOS User Password", text: $macPassword)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: 240)
+
+                            Button("Save to Keychain") {
+                                if !macPassword.isEmpty {
+                                    if KeychainHelper.savePassword(macPassword) {
+                                        hasStoredPassword = true
+                                        passwordStatusMessage = "Encrypted in macOS Keychain"
+                                        macPassword = ""
+                                    }
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(macPassword.isEmpty)
+
+                            if hasStoredPassword {
+                                Button("Remove") {
+                                    KeychainHelper.deletePassword()
+                                    hasStoredPassword = false
+                                    passwordStatusMessage = "Removed"
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                        }
+
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(hasStoredPassword ? Color.green : Color.orange)
+                                .frame(width: 6, height: 6)
+
+                            Text(hasStoredPassword ? "Keychain: Encrypted & Ready for Auto-Unlock" : "Optional: Save password to enable instant keystroke unlock on wake")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+
+                            if let msg = passwordStatusMessage {
+                                Text("• \(msg)")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.cyan)
+                            }
+                        }
+
+                        // Test Face ID Notch Animation Button
+                        Button(action: {
+                            coordinator.showFaceIDScan(isScanning: true, isUnlocked: false)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                                SoundEffectManager.playActionBeep()
+                                coordinator.showFaceIDScan(isScanning: false, isUnlocked: true)
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "faceid")
+                                Text("Test Face ID Notch HUD & Animation")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .padding(.top, 4)
+                    }
+                    .padding(10)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(8)
                 }
                 .sheet(isPresented: $isShowingEnrollmentSheet) {
                     FaceIDEnrollmentView(faceService: faceService) {

@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Squircle Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#181c24" />
+      <stop offset="50%" stop-color="#0b0d12" />
+      <stop offset="100%" stop-color="#040507" />
+    </linearGradient>
+
+    <!-- Outer Ambient Glow behind Emblem -->
+    <radialGradient id="ambientGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.35" />
+      <stop offset="40%" stop-color="#0088ff" stop-opacity="0.18" />
+      <stop offset="70%" stop-color="#7000ff" stop-opacity="0.06" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Squircle Glass Border Stroke -->
+    <linearGradient id="squircleBorder" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45" />
+      <stop offset="35%" stop-color="#00e5ff" stop-opacity="0.25" />
+      <stop offset="70%" stop-color="#ffffff" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#00aaff" stop-opacity="0.20" />
+    </linearGradient>
+
+    <!-- Base Glass Orb Spherical Gradient -->
+    <radialGradient id="glassSphere" cx="36%" cy="32%" r="68%">
+      <stop offset="0%" stop-color="#b8f5ff" />
+      <stop offset="22%" stop-color="#00d8ff" />
+      <stop offset="52%" stop-color="#0077ff" />
+      <stop offset="82%" stop-color="#003db3" />
+      <stop offset="100%" stop-color="#051438" />
+    </radialGradient>
+
+    <!-- Top-Left Specular Gloss Reflection -->
+    <linearGradient id="specularGlint" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.30" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0" />
+    </linearGradient>
+
+    <!-- Violet/Magenta Chromatic Dispersion at bottom-right of each orb -->
+    <radialGradient id="prismDispersion" cx="75%" cy="75%" r="60%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.65" />
+      <stop offset="50%" stop-color="#6366f1" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Bottom Secondary Light Bounce -->
+    <radialGradient id="bounceLight" cx="50%" cy="88%" r="45%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Drop Shadow Filters -->
+    <filter id="iconShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.7" />
+    </filter>
+
+    <filter id="orbShadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#00d2ff" flood-opacity="0.45" />
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#000000" flood-opacity="0.6" />
+    </filter>
+
+    <!-- Single Reusable Glass Orb Definition -->
+    <g id="glassOrb">
+      <!-- Base 3D Sphere -->
+      <circle cx="0" cy="0" r="48" fill="url(#glassSphere)" />
+      <!-- Chromatic Dispersion Edge -->
+      <circle cx="0" cy="0" r="48" fill="url(#prismDispersion)" />
+      <!-- Bottom Bounce Light -->
+      <circle cx="0" cy="0" r="48" fill="url(#bounceLight)" />
+      <!-- Specular Highlight Curve -->
+      <ellipse cx="-12" cy="-15" rx="26" ry="15" transform="rotate(-15 -12 -15)" fill="url(#specularGlint)" />
+      <!-- Micro Glint Pinpoint -->
+      <circle cx="-16" cy="-18" r="4.5" fill="#ffffff" opacity="0.9" />
+      <!-- Crisp Glass Fresnel Rim Stroke -->
+      <circle cx="0" cy="0" r="47.5" fill="none" stroke="url(#squircleBorder)" stroke-width="1.2" />
+    </g>
+  </defs>
+
+  <!-- 1. macOS Squircle Background -->
+  <rect x="32" y="32" width="448" height="448" rx="100" ry="100" fill="url(#bgGrad)" filter="url(#iconShadow)" />
+  <rect x="32" y="32" width="448" height="448" rx="100" ry="100" fill="none" stroke="url(#squircleBorder)" stroke-width="1.8" />
+
+  <!-- 2. Ambient Bioluminescent Glow behind Halo -->
+  <circle cx="256" cy="256" r="190" fill="url(#ambientGlow)" />
+
+  <!-- 3. Seven Glass Orbs (Hexagonal Close-Packing) -->
+  <!-- Distance D = 2 * Radius = 98px for graceful proximity -->
+  <g filter="url(#orbShadow)">
+    <!-- Surrounding 6 Orbs -->
+    <!-- 0 deg: Right -->
+    <use href="#glassOrb" x="354" y="256" />
+    <!-- 60 deg: Bottom Right -->
+    <use href="#glassOrb" x="305" y="340.8" />
+    <!-- 120 deg: Bottom Left -->
+    <use href="#glassOrb" x="207" y="340.8" />
+    <!-- 180 deg: Left -->
+    <use href="#glassOrb" x="158" y="256" />
+    <!-- 240 deg: Top Left -->
+    <use href="#glassOrb" x="207" y="171.2" />
+    <!-- 300 deg: Top Right -->
+    <use href="#glassOrb" x="305" y="171.2" />
+
+    <!-- Center Nucleus Orb -->
+    <use href="#glassOrb" x="256" y="256" />
+  </g>
+</svg>
+
