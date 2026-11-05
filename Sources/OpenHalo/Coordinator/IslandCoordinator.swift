@@ -96,19 +96,22 @@ public final class IslandCoordinator: ObservableObject {
 
         if state.isExpanded {
             switch activeTab {
-            case .calendar: return 240 + notchHeight
-            case .mirror: return 220 + notchHeight
-            case .media: return 180 + notchHeight
-            case .timers: return 170 + notchHeight
-            case .system: return 180 + notchHeight
-            case .shelf: return 150 + notchHeight
-            case .clipboard: return 175 + notchHeight
-            case .launcher: return 150 + notchHeight
-            case .focus: return 155 + notchHeight
-            case .weather: return 150 + notchHeight
+            case .calendar: return 270 + notchHeight
+            case .mirror: return 225 + notchHeight
+            case .media: return 185 + notchHeight
+            case .timers: return 175 + notchHeight
+            case .system: return 195 + notchHeight
+            case .shelf: return 160 + notchHeight
+            case .clipboard: return 185 + notchHeight
+            case .launcher: return 165 + notchHeight
+            case .focus: return 165 + notchHeight
+            case .weather: return 195 + notchHeight
             }
         }
         if case .hud = state {
+            return hasNotch ? 36 : 34
+        }
+        if case .faceID = state {
             return hasNotch ? 36 : 34
         }
         // Idle height: Exactly matches hardware notch height (32px) on notched MacBooks

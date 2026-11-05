@@ -58,13 +58,15 @@ public struct IslandRootView: View {
                             .transition(.opacity)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-            .frame(width: currentWidth, height: currentHeight)
+            .frame(width: currentWidth, height: currentHeight, alignment: .top)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.state.isExpanded)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.state.isHUD)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.activeTab)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.hasActiveLiveActivity)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.currentIslandWidth)
+            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.currentIslandHeight)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: isDropTargeted)
             .onHover { hovering in
                 coordinator.setHovering(hovering)
@@ -73,7 +75,7 @@ public struct IslandRootView: View {
                 handleDroppedProviders(providers)
             }
 
-            Spacer()
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

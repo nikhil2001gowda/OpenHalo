@@ -45,7 +45,10 @@ public struct ExpandedCardView: View {
 
             // Body Content based on activeTab
             tabContent
+
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     @ViewBuilder
