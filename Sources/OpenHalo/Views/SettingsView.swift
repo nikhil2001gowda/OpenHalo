@@ -80,15 +80,19 @@ public struct SettingsView: View {
 
                 // Active Modules
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Active Modules")
+                    Text("Active Modules & Capabilities")
                         .font(.system(size: 12, weight: .semibold))
 
+                    Toggle("Native iOS HUD Popups (Volume & Brightness Key Overlays)", isOn: $coordinator.enableHUDOverlay)
                     Toggle("Now Playing Media (Music & Spotify + Volume Slider)", isOn: $coordinator.enableMediaModule)
                     Toggle("Calendar & Next Meeting Countdown", isOn: $coordinator.enableCalendarModule)
+                    Toggle("Clipboard History Manager & Search", isOn: $coordinator.enableClipboardModule)
+                    Toggle("Quick App & Web Bookmarks Launcher", isOn: $coordinator.enableLauncherModule)
+                    Toggle("Focus Objective & Daily Task Ticker", isOn: $coordinator.enableFocusModule)
                     Toggle("Productivity Timers & Pomodoro Rings", isOn: $coordinator.enableTimerModule)
                     Toggle("System Telemetry (CPU, Memory, Battery, Brightness)", isOn: $coordinator.enableSystemModule)
                     Toggle("Temporary File Shelf & AirDrop Stash", isOn: $coordinator.enableShelfModule)
-                    Toggle("Quick Camera Mirror (Pre-call Appearance Check)", isOn: $coordinator.enableMirrorModule)
+                    Toggle("Quick Camera Mirror & On-Device Vision Check", isOn: $coordinator.enableMirrorModule)
                     Toggle("Microphone Privacy Indicator (CoreAudio HAL)", isOn: $coordinator.enableMicIndicator)
                 }
                 .toggleStyle(.checkbox)

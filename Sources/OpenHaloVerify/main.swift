@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 import OpenHaloKit
 
-print("🔍 Running OpenHalo Automated Test & Verification Suite...")
+print("🔍 Running OpenHalo 3.0 Automated Test & Verification Suite...")
 
 // 1. Test Media Track calculations
 print("Checking MediaTrack progress and formatting...")
@@ -58,14 +58,50 @@ assert(futureEvent.countdownDescription.contains("14m") || futureEvent.countdown
 assert(!futureEvent.isOngoing, "Future event should not be ongoing")
 print("✅ Calendar & Meeting URL detection passed!")
 
-// 4. Test Pill Wing Slot Enums
-print("Checking Pill Wing Slot options...")
-assert(PillLeadingSlot.allCases.count >= 5, "Expected at least 5 leading slot options")
-assert(PillTrailingSlot.allCases.count >= 6, "Expected at least 6 trailing slot options")
-assert(ExpandedTab.allCases.count == 6, "Expected 6 expanded tabs (Media, Calendar, Timers, System, Shelf, Mirror)")
-print("✅ Pill Slot options & Expanded tabs passed!")
+// 4. Test MediaMate HUD Payload
+print("Checking MediaMate HUD Payload clamping and types...")
+let hudPayload = HUDPayload(type: .volume, value: 1.5, isMuted: false)
+assert(hudPayload.value == 1.0, "HUD volume value should clamp to 1.0")
+let brightnessPayload = HUDPayload(type: .brightness, value: -0.2, isMuted: false)
+assert(brightnessPayload.value == 0.0, "HUD brightness value should clamp to 0.0")
+assert(hudPayload.type == .volume, "HUD type mismatch")
+print("✅ MediaMate HUD Payload passed!")
 
-// 5. Test Timer presets
+// 5. Test Droppy & NotchNook Clipboard Manager
+print("Checking Clipboard item classification and previews...")
+let urlClip = ClipboardItem(content: "https://apple.com/macos")
+assert(urlClip.type == .url, "Expected URL clip type")
+let hexClip = ClipboardItem(content: "#00E5FF")
+assert(hexClip.type == .color, "Expected Color clip type")
+let codeClip = ClipboardItem(content: "func test() { return 42 }")
+assert(codeClip.type == .code, "Expected Code clip type")
+let textClip = ClipboardItem(content: "Hello, world!")
+assert(textClip.type == .text, "Expected Text clip type")
+print("✅ Clipboard Item classification passed!")
+
+// 6. Test NotchNook & Atoll App Launcher Shortcuts
+print("Checking App Launcher Shortcuts...")
+let defaultShortcuts = LauncherShortcut.defaults
+assert(defaultShortcuts.count >= 4, "Expected at least 4 default shortcuts")
+assert(defaultShortcuts.contains(where: { $0.name == "Safari" }), "Safari shortcut missing")
+assert(defaultShortcuts.contains(where: { $0.name == "Terminal" }), "Terminal shortcut missing")
+print("✅ App Launcher Shortcuts passed!")
+
+// 7. Test Alcove & Droppy Focus Tasks
+print("Checking Focus Task items...")
+let task = FocusTaskItem(title: "Complete OpenHalo 3.0", isCompleted: false)
+assert(task.title == "Complete OpenHalo 3.0", "Task title mismatch")
+assert(!task.isCompleted, "Task should start uncompleted")
+print("✅ Focus Tasks passed!")
+
+// 8. Test Pill Wing Slot Enums & 9 Expanded Tabs
+print("Checking Pill Wing Slot options & 9 Expanded Tabs...")
+assert(PillLeadingSlot.allCases.count >= 6, "Expected at least 6 leading slot options")
+assert(PillTrailingSlot.allCases.count >= 7, "Expected at least 7 trailing slot options")
+assert(ExpandedTab.allCases.count == 9, "Expected 9 expanded tabs (Media, Calendar, Timers, Focus, Clips, Apps, System, Shelf, Mirror)")
+print("✅ Pill Slot options & 9 Expanded tabs passed!")
+
+// 9. Test Timer presets
 print("Checking Timer presets...")
 let presets = TimerService.defaultPresets
 assert(presets.count == 4, "Expected 4 default presets")
@@ -75,7 +111,7 @@ assert(presets[2].seconds == 900, "15m preset mismatch")
 assert(presets[3].seconds == 1500, "25m Pomodoro preset mismatch")
 print("✅ Timer presets passed!")
 
-// 6. Test Shelf Item creation
+// 10. Test Shelf Item creation
 print("Checking ShelfItem creation...")
 let tempURL = URL(fileURLWithPath: "/tmp/sample.txt")
 let item = ShelfItem(url: tempURL)
@@ -83,7 +119,7 @@ assert(item.name == "sample.txt", "Shelf item name mismatch")
 assert(item.url.path == "/tmp/sample.txt", "Shelf item path mismatch")
 print("✅ ShelfItem passed!")
 
-// 7. Test Screen Notch detector
+// 11. Test Screen Notch detector
 print("Checking ScreenNotchDetector...")
 let geometry = ScreenNotchDetector.detect(for: nil)
 assert(geometry.screenFrame.width > 0, "Screen width must be positive")
@@ -91,4 +127,4 @@ assert(geometry.screenFrame.height > 0, "Screen height must be positive")
 assert(geometry.notchRect.width > 0, "Notch width must be positive")
 print("✅ ScreenNotchDetector passed!")
 
-print("🎉 All OpenHalo verification checks passed successfully!")
+print("🎉 All 11 OpenHalo 3.0 verification checks passed successfully!")

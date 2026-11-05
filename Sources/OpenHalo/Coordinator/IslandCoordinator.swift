@@ -19,6 +19,7 @@ public final class IslandCoordinator: ObservableObject {
     @Published public var activeTab: ExpandedTab = .media
     @Published public var isHovering: Bool = false
     @Published public var isDropHovered: Bool = false
+    @Published public var requiresKeyboardFocus: Bool = false
 
     // Preferences
     @Published public var displayMode: IslandDisplayMode = .autoDetect
@@ -26,10 +27,14 @@ public final class IslandCoordinator: ObservableObject {
     @Published public var enableMediaModule: Bool = true
     @Published public var enableCalendarModule: Bool = true
     @Published public var enableTimerModule: Bool = true
+    @Published public var enableFocusModule: Bool = true
+    @Published public var enableClipboardModule: Bool = true
+    @Published public var enableLauncherModule: Bool = true
     @Published public var enableSystemModule: Bool = true
     @Published public var enableShelfModule: Bool = true
     @Published public var enableMirrorModule: Bool = true
     @Published public var enableMicIndicator: Bool = true
+    @Published public var enableHUDOverlay: Bool = true
 
     // Pill Wing Slots Configuration
     @Published public var leadingSlot: PillLeadingSlot = .auto
@@ -45,8 +50,13 @@ public final class IslandCoordinator: ObservableObject {
     public let systemControls = SystemControlService()
     public let calendarService = CalendarService()
     public let mirrorService = MirrorService()
+    public let clipboardService = ClipboardHistoryService()
+    public let appLauncherService = AppLauncherService()
+    public let focusService = FocusNoteService()
+    public let presenceService = PresenceDetectionService()
 
     private var autoCollapseWorkItem: DispatchWorkItem?
+    private var hudDismissWorkItem: DispatchWorkItem?
     private var cancellables = Set<AnyCancellable>()
 
     public init() {
@@ -74,6 +84,45 @@ public final class IslandCoordinator: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        // MediaMate HUD Volume Listener
+        systemControls.onVolumeChanged = { [weak self] vol, isMuted in
+            guard let self = self, self.enableHUDOverlay else { return }
+            self.showHUD(type: .volume, value: vol, isMuted: isMuted)
+        }
+
+        // MediaMate HUD Brightness Listener
+        systemControls.onBrightnessChanged = { [weak self] brightness in
+            guard let self = self, self.enableHUDOverlay else { return }
+            self.showHUD(type: .brightness, value: brightness, isMuted: false)
+        }
+    }
+
+    public func showHUD(type: HUDPayload.HUDType, value: Float, isMuted: Bool = false) {
+        // Do not interrupt expanded work
+        if state.isExpanded { return }
+
+        hudDismissWorkItem?.cancel()
+        let payload = HUDPayload(type: type, value: value, isMuted: isMuted)
+
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+            self.state = .hud(payload)
+        }
+
+        let item = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            if case .hud = self.state {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+                    self.state = .compact
+                }
+            }
+        }
+        hudDismissWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: item)
+    }
+
+    public func setKeyboardFocus(_ focus: Bool) {
+        self.requiresKeyboardFocus = focus
     }
 
     public func setHovering(_ hovering: Bool) {
@@ -101,10 +150,12 @@ public final class IslandCoordinator: ObservableObject {
 
     public func expandTo(tab: ExpandedTab) {
         cancelAutoCollapse()
+        hudDismissWorkItem?.cancel()
 
         // Privacy & battery protection: Stop camera if navigating away from Mirror tab
         if activeTab == .mirror && tab != .mirror {
             mirrorService.stopSession()
+            presenceService.stopAndCleanup()
         }
 
         self.activeTab = tab
@@ -127,8 +178,11 @@ public final class IslandCoordinator: ObservableObject {
 
     public func collapseToCompact() {
         cancelAutoCollapse()
+        hudDismissWorkItem?.cancel()
         hardwareMonitor.stopPolling()
         mirrorService.stopSession() // Never leave camera running when collapsed
+        presenceService.stopAndCleanup()
+        setKeyboardFocus(false)
 
         withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
             self.state = .compact
@@ -147,14 +201,14 @@ public final class IslandCoordinator: ObservableObject {
         cancelAutoCollapse()
         guard state.isExpanded else { return }
 
-        // If user is actively using the Camera Mirror, don't auto-collapse
-        if activeTab == .mirror {
+        // If user is actively typing or using Camera Mirror, don't auto-collapse
+        if activeTab == .mirror || requiresKeyboardFocus {
             return
         }
 
         let item = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
-            if !self.isHovering && !self.isDropHovered {
+            if !self.isHovering && !self.isDropHovered && !self.requiresKeyboardFocus {
                 self.collapseToCompact()
             }
         }

@@ -8,9 +8,69 @@ public final class SystemControlService: ObservableObject {
     @Published public var brightness: Float = 0.75
     @Published public var isMuted: Bool = false
 
+    public var onVolumeChanged: ((Float, Bool) -> Void)?
+    public var onBrightnessChanged: ((Float) -> Void)?
+
+    private var currentOutputDeviceID: AudioDeviceID = 0
+    private var isObserving: Bool = false
+
     public init() {
         fetchCurrentVolume()
         fetchCurrentBrightness()
+        startHardwareVolumeListener()
+    }
+
+    deinit {
+        // Cleanup listener if needed
+    }
+
+    // MARK: - CoreAudio Hardware Volume Observation (MediaMate HUD Replacement)
+
+    public func startHardwareVolumeListener() {
+        guard !isObserving else { return }
+        isObserving = true
+
+        var defaultOutputDevice = AudioDeviceID(0)
+        var propertySize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &propertySize,
+            &defaultOutputDevice
+        )
+
+        if status == noErr && defaultOutputDevice != 0 {
+            self.currentOutputDeviceID = defaultOutputDevice
+            registerVolumeListener(for: defaultOutputDevice)
+        }
+    }
+
+    private func registerVolumeListener(for deviceID: AudioDeviceID) {
+        var volumeAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyVolumeScalar,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        AudioObjectAddPropertyListenerBlock(
+            deviceID,
+            &volumeAddress,
+            DispatchQueue.main
+        ) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.fetchCurrentVolume()
+                self.onVolumeChanged?(self.volume, self.isMuted)
+            }
+        }
     }
 
     // MARK: - Volume Management (CoreAudio + AppleScript Fallback)
@@ -131,11 +191,10 @@ public final class SystemControlService: ObservableObject {
     public func setBrightness(_ newBrightness: Float) {
         let clamped = max(0.0, min(1.0, newBrightness))
         self.brightness = clamped
+        self.onBrightnessChanged?(clamped)
 
-        // Set brightness via brightness script/utility
         let brightnessPercent = Int(clamped * 100)
         Task {
-            // macOS system brightness AppleScript bridge
             let script = """
             tell application "System Events"
                 -- Brightness update trigger
@@ -146,4 +205,3 @@ public final class SystemControlService: ObservableObject {
         }
     }
 }
-

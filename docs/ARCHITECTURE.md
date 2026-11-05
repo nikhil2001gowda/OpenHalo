@@ -10,25 +10,29 @@ OpenHalo is an open-source, zero-dependency native macOS status-item and Dynamic
 graph TD
     subgraph UI ["SwiftUI Presentation Layer"]
         Root["IslandRootView (Continuous Capsule Morphing Container)"]
-        Compact["CompactPillView (Configurable Wing Slots)"]
-        ExpandedDeck["ExpandedCardView (6-Tab Dashboard)"]
+        HUDView["MediaMateHUDView (Drop-Down iOS Pill Slider)"]
+        Compact["CompactPillView (Configurable Wing Slots & Focus Ticker)"]
+        ExpandedDeck["ExpandedCardView (9-Tab Dashboard)"]
         MediaView["MediaExpandedView (Track scrubber, controls, volume)"]
         CalView["CalendarExpandedView (Meeting countdown & 1-click video join)"]
         TimerView["TimerExpandedView (Interactive rings & Pomodoro)"]
+        FocusView["FocusNoteExpandedView (Goal ticker & task checklist)"]
+        ClipView["ClipboardExpandedView (Search, filter, click-to-copy)"]
+        LaunchView["LauncherExpandedView (App dock & web bookmarks)"]
         SysView["SystemHealthView (CPU/RAM/Battery & brightness)"]
         ShelfView["FileShelfView (Drag-and-drop staging & AirDrop)"]
-        MirrorView["MirrorExpandedView (Pre-call appearance check)"]
+        MirrorView["MirrorExpandedView (Pre-call look & Vision Presence)"]
     end
 
     subgraph Windowing ["AppKit Windowing Engine"]
-        Panel["IslandPanel (Non-activating NSPanel, .statusBar Level)"]
+        Panel["IslandPanel (Non-activating NSPanel, Dynamic canBecomeKey)"]
         WinCtrl["IslandWindowController (Auto-docking & Screen Geometry Listener)"]
         Detector["ScreenNotchDetector (Hardware Notch vs Floating Pill Math)"]
     end
 
     subgraph Coordinator ["State & Event Orchestration"]
         Coord["IslandCoordinator (@MainActor State Machine)"]
-        State["IslandPresentationState (.compact vs .expanded(tab))"]
+        State["IslandPresentationState (.compact, .hud, .expanded, .shelfDropZone)"]
     end
 
     subgraph Services ["Native Hardware & System Observers"]
@@ -36,11 +40,15 @@ graph TD
         AudioMon["AudioActivityMonitor (CoreAudio HAL Input Device Listener)"]
         BatSvc["BatteryService (IOKit IOPowerSources Observer)"]
         MachSvc["HardwareMonitorService (Mach host_statistics64 Telemetry)"]
-        SysCtrl["SystemControlService (CoreAudio Volume & System Brightness)"]
+        SysCtrl["SystemControlService (CoreAudio Volume Key Listener & Brightness)"]
         CalSvc["CalendarService (EventKit Schedule & Regex Extractor)"]
         TimerSvc["TimerService (DispatchSource Precision Countdown)"]
         ShelfSvc["FileShelfService (Temporary Drag Staging & AirDrop)"]
         MirrorSvc["MirrorService (AVCaptureSession with Zero-Leakage Teardown)"]
+        ClipSvc["ClipboardHistoryService (NSPasteboard Polling & Memory Cache)"]
+        LaunchSvc["AppLauncherService (NSWorkspace App & Bookmark Manager)"]
+        FocusSvc["FocusNoteService (Headline Goal & Daily Checklist)"]
+        PresenceSvc["PresenceDetectionService (Apple Vision VNDetectFaceRectanglesRequest)"]
     end
 
     Panel --> WinCtrl
@@ -50,10 +58,14 @@ graph TD
     Coord --> State
     Coord --> Services
     Root --> Compact
+    Root --> HUDView
     Root --> ExpandedDeck
     ExpandedDeck --> MediaView
     ExpandedDeck --> CalView
     ExpandedDeck --> TimerView
+    ExpandedDeck --> FocusView
+    ExpandedDeck --> ClipView
+    ExpandedDeck --> LaunchView
     ExpandedDeck --> SysView
     ExpandedDeck --> ShelfView
     ExpandedDeck --> MirrorView
@@ -63,12 +75,12 @@ graph TD
 
 ## 2. Windowing Engine & Focus Invariants
 
-### 2.1 Non-Activating Floating Panel
-To maintain macOS system responsiveness without stealing keyboard focus or disrupting full-screen games, keynotes, or code editors:
+### 2.1 Dynamic Non-Activating Floating Panel
+To maintain macOS system responsiveness without stealing keyboard focus or disrupting active full-screen applications:
 - **Subclass**: `NSPanel` with styles `[.borderless, .nonactivatingPanel]`.
 - **Window Level**: `.statusBar` (`CGWindowLevelKey.statusWindow`), placing the island cleanly over full-screen apps and system menu bars.
 - **Collection Behavior**: `[.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]`.
-- **Keyboard Handling**: `canBecomeKey = false` ensures that typing in Xcode, Terminal, or Slack is never interrupted when hovering over or interacting with OpenHalo.
+- **Dynamic Keyboard Focus**: `canBecomeKey` is dynamically gated by `IslandCoordinator.shared.requiresKeyboardFocus`. During normal mouse moves, hover peeks, and tab navigation, focus is strictly rejected (`false`), ensuring Xcode, Terminal, or games are never interrupted. Focus is only temporarily acquired when clicking an active search or note input, and is immediately released on collapse.
 
 ### 2.2 Notch Geometry Detection
 ```swift
@@ -96,16 +108,10 @@ Unlike tools that record audio to visualize microphone activity, `AudioActivityM
 - Captures **zero audio samples and reads zero buffers**.
 - Requires **no microphone recording permissions** (`NSMicrophoneUsageDescription`), ensuring user privacy by design.
 
-### 3.2 Camera Power Cutoff Guard
-To avoid leaving the MacBook hardware green camera LED illuminated:
-- `MirrorService` only initializes the `AVCaptureSession` when `.mirror` is the actively viewed tab.
-- As soon as the tab changes or the island collapses, `stopSession()` is invoked immediately on a high-priority background queue.
-- Auto-collapse timers are temporarily paused while on the Mirror tab to avoid interrupting pre-call appearance checks.
+### 3.2 Single-Burst On-Device Vision Presence Check
+`PresenceDetectionService` uses Apple's native `Vision` framework (`VNDetectFaceRectanglesRequest`) for privacy-preserving user presence checks:
+- **100% On-Device**: Analyzed locally using the Apple Neural Engine. Zero frames are ever saved to disk or transmitted over the network.
+- **Strict Power Cutoff**: Runs exclusively in single-burst mode (spins up camera, processes 1 frame, and immediately halts the `AVCaptureSession`), preventing the green hardware camera LED from latching on.
 
----
-
-## 4. Hardware Telemetry & Efficiency
-
-- **Mach Kernel CPU & Memory**: `HardwareMonitorService` samples `host_processor_info` and `host_statistics64`. Polling is completely suspended whenever the island is collapsed, consuming virtually 0% CPU at idle.
-- **Battery & AC Detection**: Powered by `IOKit/IOPowerSources` run-loop sources, receiving push notifications from macOS power management rather than busy-polling.
-- **Zero Third-Party Dependencies**: OpenHalo imports only Apple system frameworks (`SwiftUI`, `AppKit`, `CoreAudio`, `IOKit`, `EventKit`, `AVFoundation`).
+### 3.3 MediaMate-Style Native HUD Replacement
+`SystemControlService` registers CoreAudio property listener blocks on `kAudioDevicePropertyVolumeScalar`. Whenever volume keys (F11/F12) are adjusted, OpenHalo drops a fluid, iOS-style pill slider banner from the notch that automatically dismisses after 1.8 seconds.

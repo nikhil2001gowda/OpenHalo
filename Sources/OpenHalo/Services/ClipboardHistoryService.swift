@@ -1,0 +1,84 @@
+import Foundation
+import AppKit
+import Combine
+
+@MainActor
+public final class ClipboardHistoryService: ObservableObject {
+    @Published public var items: [ClipboardItem] = []
+    @Published public var searchQuery: String = ""
+    @Published public var lastCopiedToast: String? = nil
+
+    private var lastChangeCount: Int = 0
+    private var pollTimer: Timer?
+    private let maxItems: Int = 40
+
+    public init() {
+        self.lastChangeCount = NSPasteboard.general.changeCount
+        startMonitoring()
+    }
+
+    public func startMonitoring() {
+        pollTimer?.invalidate()
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.checkForNewClip()
+            }
+        }
+    }
+
+    public func stopMonitoring() {
+        pollTimer?.invalidate()
+        pollTimer = nil
+    }
+
+    public func checkForNewClip() {
+        let pasteboard = NSPasteboard.general
+        let currentChangeCount = pasteboard.changeCount
+
+        guard currentChangeCount != lastChangeCount else { return }
+        lastChangeCount = currentChangeCount
+
+        guard let text = pasteboard.string(forType: .string), !text.isEmpty else { return }
+
+        // Ignore duplicate consecutive entries
+        if let first = items.first, first.content == text {
+            return
+        }
+
+        let newItem = ClipboardItem(content: text)
+        items.insert(newItem, at: 0)
+
+        if items.count > maxItems {
+            items = Array(items.prefix(maxItems))
+        }
+    }
+
+    public func copyToClipboard(_ item: ClipboardItem) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(item.content, forType: .string)
+        self.lastChangeCount = pasteboard.changeCount
+
+        self.lastCopiedToast = "Copied to clipboard!"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            if self?.lastCopiedToast != nil {
+                self?.lastCopiedToast = nil
+            }
+        }
+    }
+
+    public func deleteItem(id: UUID) {
+        items.removeAll { $0.id == id }
+    }
+
+    public func clearAll() {
+        items.removeAll()
+    }
+
+    public var filteredItems: [ClipboardItem] {
+        if searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return items
+        }
+        return items.filter { $0.content.localizedCaseInsensitiveContains(searchQuery) }
+    }
+}

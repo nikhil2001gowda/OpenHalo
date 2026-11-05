@@ -2,6 +2,7 @@
 
 # OpenHalo 🏝️✨
 ### The Ultimate Native Dynamic Island for macOS
+*(Synthesizing the Best of Halo, Boring Notch, Droppy, MediaMate, NotchNook, Alcove, Atoll & Notchy)*
 
 **Fluid. Private. Powerful. 100% Free & Open Source Forever.**
 
@@ -18,18 +19,22 @@
      │  ♫ Midnight City   [==|===]   │   ← Idle Notch & Floating Pill
      ╰───────────────────────────────╯
                     ▼ (Hover or ⌘+⌃+I)
-   ╭───────────────────────────────────────────╮
-   │  [♫ Media] [🗓️ Meet] [⏱️ Timers] [📊 Sys] │
-   │  ───────────────────────────────────────  │
-   │  M83 — Hurry Up, We're Dreaming           │
-   │  ⏮   ▶⏸   ⏭   ───●──── 🔊 [====|====]    │
-   │                                           │
-   │  🗓️ In 12m: Product Design Sync           │
-   │  [ 🟢 Join Google Meet ]                   │
-   ╰───────────────────────────────────────────╯
+   ╭───────────────────────────────────────────────────╮
+   │  [♫ Media] [🗓️ Meet] [⏱️ Timers] [🎯 Focus] [📋]   │
+   │  ───────────────────────────────────────────────  │
+   │  M83 — Hurry Up, We're Dreaming                   │
+   │  ⏮   ▶⏸   ⏭   ───●──── 🔊 [====|====]            │
+   │                                                   │
+   │  🗓️ In 12m: Architecture & Product Review          │
+   │  [ 🟢 Join Google Meet ]                           │
+   ╰───────────────────────────────────────────────────╯
+                    ▼ (Volume Key Pressed)
+     ╭───────────────────────────────╮
+     │  🔊  [==========|====]  75%   │   ← MediaMate iOS HUD Popup
+     ╰───────────────────────────────╯
 ```
 
-**OpenHalo** transforms the MacBook notch—and external displays—into an interactive, physics-driven command center. Seamlessly control your music, join upcoming meetings with one click, check your camera appearance before video calls, stash files for instant AirDrop, and monitor live system vitals.
+**OpenHalo** unites the standout capabilities of every major notch and island utility into a single, cohesive, ultra-fast application. Control music, replace ugly system volume HUDs with fluid iOS sliders, search clipboard history, launch pinned apps, join video meetings with one click, run on-device vision presence checks, and stash files for instant AirDrop.
 
 **No subscriptions. No cloud accounts. No background telemetry. Pure native Swift.**
 
@@ -37,94 +42,76 @@
 
 </div>
 
-## 💡 Why OpenHalo?
+## 💡 The Grand Comparison: OpenHalo vs. The Ecosystem
 
-Most Mac notch tools today charge expensive monthly subscriptions, bundle proprietary closed-source code, run heavy electron wrappers that eat your battery, or require invasive system permissions.
+Why pay monthly subscriptions or buy 4 separate utilities when you can have everything in one native, privacy-preserving open-source tool?
 
-OpenHalo was engineered from the ground up to redefine what macOS utility software should be:
-
-| Feature | OpenHalo (Free & Open Source) | Typical Paid Notch Apps |
+| Capability / App Inspiration | OpenHalo (Free & Open Source) | Standalone Paid Apps |
 | :--- | :---: | :---: |
-| **Pricing** | **100% Free Forever (MIT)** | $15–$30 license or recurring sub |
-| **Source Code** | **100% Open Source** | Closed-source proprietary |
-| **Dependencies** | **0 (Pure Apple SDK)** | Multiple external frameworks / Electron |
-| **Data Privacy** | **100% Local / Zero Outbound** | Cloud analytics / telemetry trackers |
-| **Battery Impact** | **Near-Zero (Suspended at idle)** | Constant background polling |
-| **Microphone Privacy** | **Zero-TCC HAL device listener** | Audio recording permissions / prompts |
-| **Camera Mirror** | **Instant hardware cutoff** | Risk of persistent camera LED state |
-| **Display Support** | **MacBook Notch + Floating Pill** | Often limited to built-in notch only |
+| **Pricing** | **100% Free Forever (MIT)** | $10–$25 each, or recurring subs |
+| **MediaMate Style Native HUDs** | **Built-in iOS volume/brightness popups** | MediaMate ($9.20) |
+| **Droppy Style Clipboard Manager** | **Full history, search, & 1-click copy** | Droppy ($9.99) / NotchNook ($25) |
+| **NotchNook Style App Launcher** | **App dock & web bookmarks in notch** | NotchNook ($25) / Atoll |
+| **Alcove Style Live Focus Ticker** | **Wing slot ticker & daily checklist** | Alcove ($14.99) |
+| **Notchy Style Vision Presence** | **100% On-Device Apple Vision checks** | Notchy ($24.99) |
+| **Halo & Boring Notch Core** | **Music scrubber, calendar, mirror, shelf** | Halo ($19) / Boring Notch |
+| **Telemetry & Outbound Network** | **0 Requests (100% Offline)** | Cloud analytics / telemetry |
+| **Microphone Privacy** | **Zero-TCC HAL Listener (0 buffers)** | Mic recording prompts |
+| **Battery Impact** | **Near-Zero (Suspended when idle)** | Often heavy background polling |
 
 ---
 
-## 🌟 Supercharged Feature Deck
+## 🌟 Complete Feature Deck (9-Tab Cockpit)
 
-### 1. 🏝️ Adaptive Notch & Floating Capsule Engine
-- **Hardware Notch Snapping:** Automatically detects your MacBook Pro or MacBook Air display notch geometry using `NSScreen.safeAreaInsets` and docks flush to the bezel.
-- **Universal Floating Island:** Running on an external display, Mac mini, Mac Studio, or notchless Mac? OpenHalo morphs into an elegant floating capsule pill with an 8pt margin from the menu bar.
-- **Apple-Grade Spring Dynamics:** Interactive interactive spring morphing (`response: 0.35, dampingFraction: 0.75`) between idle capsule, hover peek, and full 6-tab expanded decks.
+### 1. 🔊 MediaMate Native HUD Replacement
+- **Drop-Down iOS Sliders:** Replaces the default macOS volume and display brightness overlay boxes with smooth, rounded iOS pill sliders descending directly from the notch.
+- **Hardware Key Interception:** Listens to CoreAudio HAL property notifications (`kAudioDevicePropertyVolumeScalar`) when function keys (F11/F12) are pressed.
+- **Auto-Dismiss:** Drops down fluidly and auto-retracts back into the notch after 1.8 seconds.
 
-### 2. 🎛️ Customizable Pill Wing Slots (Left & Right)
-Tailor the idle notch cap to show exactly what matters to you at a glance:
-- **Left Wing Slot:**
-  - `Smart Auto` (Prioritizes active timer → upcoming meeting → now playing music)
-  - `Now Playing` (Track artist & title)
-  - `Next Meeting` (Live countdown: *"In 14m"*)
-  - `Pomodoro / Timer` (Live countdown clock)
-  - `Digital Clock` (Current local time)
-- **Right Wing Slot:**
-  - `Smart Auto` (Prioritizes microphone security dot → audio waveform → battery)
-  - `Audio Waveform` (Live animated sound equalizer bars)
-  - `Battery Level` (Live battery % and charging glyph)
-  - `Microphone Security Dot` (Active microphone indicator)
-  - `Master Volume` (Live volume level indicator)
-  - `Minimal` (Clean black notch bezel)
+### 2. 📋 Droppy & NotchNook Clipboard History Manager
+- **Automatic Clipboard Interception:** Monitors `NSPasteboard` changes and caches recent clippings locally in memory.
+- **Smart Content Detection:** Automatically categorizes clips into `Link`, `Color Hex`, `Code`, and `Text` with distinct color badges.
+- **Instant Search & 1-Click Copy:** Fast substring filter and copy-back to clipboard with visual toast alerts.
 
-### 3. 🎵 Universal Media Center & Audio Controls
-- **Apple Music & Spotify Support:** Automatically intercepts playback changes via low-overhead `DistributedNotificationCenter` listeners.
-- **Full Interactive Deck:** Real-time album artwork, track title, artist name, and click-to-seek scrubber.
-- **Built-in System Volume Slider:** Adjust master output audio directly inside the island using native CoreAudio HAL scalars.
-- **Transport Controls:** Previous, Play/Pause toggle, and Next track with keyboard and click navigation.
+### 3. 🚀 NotchNook & Atoll App & Bookmark Launcher Dock
+- **Quick Dock:** Pinned favorites dock right inside the Dynamic Island for Finder, Safari, Terminal, Notes, Slack, Xcode, and custom web URLs.
+- **1-Click Launch:** Launches applications or opens browser bookmarks with native `NSWorkspace` execution.
 
-### 4. 🗓️ Smart Calendar & 1-Click Video Call Launcher
-- **Next Meeting Countdown:** Always know what’s next without opening your calendar (`"In 8m: Architecture Review"`, `"Happening Now"`).
-- **1-Click Call Join:** Intelligent regex engine parses meeting invites and renders an instant one-click join button for:
+### 4. 🎯 Alcove Live Focus Objective & Task Ticker
+- **Notch Wing Ticker:** Pin your primary focus goal (*"Ship OpenHalo v3"*) directly into the compact notch pill wing!
+- **Daily Checklist:** Add, toggle, and manage quick tasks with instant visual strikethrough and completion counters.
+
+### 5. 👁️ Notchy On-Device Vision Presence & Face Detection
+- **100% On-Device Machine Learning:** Leverages Apple's native `Vision` framework (`VNDetectFaceRectanglesRequest`) running on the Apple Neural Engine.
+- **Strict Single-Burst Hygiene:** Captures exactly 1 frame on user request, analyzes presence, and shuts down the camera session immediately. The green hardware camera LED never latches on!
+
+### 6. 🎵 Universal Media Center & Audio Controls
+- **Apple Music & Spotify Support:** Automatically tracks song metadata, artist, album, and artwork via `DistributedNotificationCenter`.
+- **Full Interactive Deck:** Click-to-seek scrubber, transport buttons, master CoreAudio volume slider, and live animated equalizer waveform visualizer.
+
+### 7. 🗓️ Smart Calendar & 1-Click Meeting Join
+- **Live Countdown:** Displays remaining time until your next event (*"In 12m: Architecture Review"*).
+- **1-Click Video Call Launcher:** Intelligent regex engine extracts join links for:
   - 🟢 **Google Meet** (`meet.google.com/...`)
   - 🔵 **Zoom** (`zoom.us/j/...`)
   - 🟣 **Microsoft Teams** (`teams.microsoft.com/...`)
   - 🟠 **Cisco Webex** (`webex.com/...`)
-- **Full Today Agenda:** Inspect remaining events scheduled for the day.
 
-### 5. 🪞 Quick Camera Mirror
-- **Pre-Call Appearance Check:** Open the Mirror tab to verify your lighting, framing, and background before joining a video conference.
-- **Zero LED Leakage:** The `AVCaptureSession` is strictly initialized only when the Mirror tab is visible and shuts down the moment you switch tabs or collapse the island, ensuring the green hardware LED never remains illuminated in the background.
-- **Camera Device Switcher:** Easily toggle between built-in FaceTime HD cameras and external studio webcams.
+### 8. 📥 File Shelf & Instant AirDrop Stash
+- **Drop to Stash:** Drag files or folders directly over the notch to hold them temporarily while navigating between desktop spaces.
+- **Native AirDrop:** Beam individual staged files or all files simultaneously via `NSSharingService`.
+- **Drag-Out:** Drag files directly into Slack, Mail, WhatsApp, or Finder.
 
-### 6. 📥 Temporary File Shelf & 1-Click AirDrop
-- **Drop to Stash:** Drag any file or folder directly onto the notch to park it temporarily while switching desktop spaces or applications.
-- **Quick AirDrop:** Beam individual staged files or all files at once via native macOS AirDrop (`NSSharingService`).
-- **Drag-Out Everywhere:** Drag staged files directly out of OpenHalo into Slack, Mail, WhatsApp, Discord, or Finder.
-
-### 7. 📊 Live System Telemetry & Brightness Control
-- **Mach Kernel CPU Telemetry:** Live per-core processor load via `host_processor_info`.
-- **Memory Consumption:** Active RAM utilization breakdown via `host_statistics64`.
-- **Battery & AC Health:** Direct battery percentage, adapter status, and charging state via `IOKit/IOPowerSources`.
-- **Integrated Display Brightness Slider:** Seamlessly adjust display illumination right from the island deck.
-- **Zero Idle Overhead:** Telemetry polling is automatically suspended when the island collapses!
-
-### 8. ⏱️ Productivity Timers & Pomodoro Rings
-- Quick presets for **1 minute**, **5 minutes**, **15 minutes**, and **25-minute Pomodoro sprints**.
-- Visual circular countdown rings with play, pause, reset, and chime audio alerts.
-
-### 9. 🎙️ Zero-Permission Microphone Security Dot
-- Alerts you the exact moment any application accesses audio input on your Mac.
-- Built via CoreAudio HAL property listeners (`kAudioDevicePropertyDeviceIsRunningSomewhere`).
-- **Never reads or records audio buffers**—100% private with zero microphone permission prompts!
+### 9. 📊 Hardware Telemetry & Brightness Control
+- Real-time CPU usage meter via Mach kernel APIs (`host_processor_info`).
+- RAM memory utilization (used GB / total GB) via `host_statistics64`.
+- Battery percentage, power adapter status, and charging state via `IOKit/IOPowerSources`.
+- Integrated display brightness slider.
+- Zero CPU overhead when collapsed!
 
 ---
 
 ## 🔒 Security & Privacy Manifesto
-
-At OpenHalo, user privacy is non-negotiable.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -133,13 +120,13 @@ At OpenHalo, user privacy is non-negotiable.
 │  ✓ 0 Outbound Network Requests (Runs 100% offline)              │
 │  ✓ 0 Analytics, Crash Reporters, or Telemetry Trackers          │
 │  ✓ 0 Cloud Accounts or API Keys Required                        │
-│  ✓ 0 Audio Recording Buffers Captured                           │
-│  ✓ Camera Session Shuts Down Immediately Upon Tab Collapse      │
+│  ✓ 0 Audio Recording Buffers Captured (CoreAudio HAL only)      │
+│  ✓ Camera Shuts Down Immediately Upon Tab Collapse / Scan       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-1. **Non-Activating Windowing Engine**: OpenHalo runs as a non-activating `NSPanel` at the `.statusBar` window level. It will never steal key focus or interrupt you while you are actively typing in your IDE, terminal, or document editors.
-2. **Local macOS APIs Only**: All functionality is powered directly by Apple's own system APIs: `EventKit`, `CoreAudio`, `IOKit`, `AppKit`, `AVFoundation`, and `SwiftUI`.
+1. **Non-Activating Windowing Engine**: OpenHalo runs as a non-activating `NSPanel` at `.statusBar` level. Typing in Xcode, Terminal, or Slack is never interrupted. Focus is only temporarily enabled during active search or note editing.
+2. **Apple Frameworks Exclusively**: 100% standard library and Apple system SDKs (`Vision`, `CoreAudio`, `IOKit`, `EventKit`, `AppKit`, `SwiftUI`, `AVFoundation`).
 
 ---
 
@@ -151,9 +138,12 @@ At OpenHalo, user privacy is non-negotiable.
 | `⌘ + 1` | Switch to **Media Player** Tab |
 | `⌘ + 2` | Switch to **Calendar & Meeting** Tab |
 | `⌘ + 3` | Switch to **Timers & Pomodoro** Tab |
-| `⌘ + 4` | Switch to **System Health & Brightness** Tab |
-| `⌘ + 5` | Switch to **File Shelf & AirDrop** Tab |
-| `⌘ + 6` | Switch to **Quick Camera Mirror** Tab |
+| `⌘ + 4` | Switch to **Focus Task & Notes** Tab |
+| `⌘ + 5` | Switch to **Clipboard History** Tab |
+| `⌘ + 6` | Switch to **App & Bookmark Launcher** Tab |
+| `⌘ + 7` | Switch to **System Health & Brightness** Tab |
+| `⌘ + 8` | Switch to **File Shelf & AirDrop** Tab |
+| `⌘ + 9` | Switch to **Quick Camera Mirror & Vision** Tab |
 | **Hover** | Peek into island status (auto-collapses on cursor exit) |
 | **Drag & Drop** | Drag files directly over the notch to stash them |
 
@@ -161,12 +151,7 @@ At OpenHalo, user privacy is non-negotiable.
 
 ## 🚀 Installation & Quick Start
 
-### Option 1: Download Pre-Built Application Bundle
-1. Download the latest release from the [Releases](https://github.com/nikhil2001gowda/OpenHalo/releases) page.
-2. Unzip and drag `OpenHalo.app` into your `/Applications` folder.
-3. Open the app. The discreet menu bar icon will appear and the Dynamic Island will dock neatly over your notch!
-
-### Option 2: Build From Source
+### Build & Run From Source
 
 Requirements: macOS 14.0+ (Sonoma or Sequoia) and Xcode 15+ / Swift 5.9+.
 
@@ -175,10 +160,10 @@ Requirements: macOS 14.0+ (Sonoma or Sequoia) and Xcode 15+ / Swift 5.9+.
 git clone https://github.com/nikhil2001gowda/OpenHalo.git
 cd OpenHalo
 
-# Run automated tests and assertions
+# Run automated verification suite (11 test suites)
 swift run OpenHaloVerify
 
-# Build the release application bundle
+# Build and package the release application
 ./scripts/build_app.sh
 
 # Launch OpenHalo
@@ -197,17 +182,21 @@ OpenHalo/
 │   │   └── OpenHaloApp.swift                 # Application entry point (@main)
 │   ├── OpenHalo/
 │   │   ├── App/
-│   │   │   └── AppDelegate.swift             # Menu bar extra & window coordinator
+│   │   │   └── AppDelegate.swift             # Menu bar extra & global shortcuts
 │   │   ├── Coordinator/
-│   │   │   ├── IslandCoordinator.swift      # Central state machine & service lifecycle
-│   │   │   └── IslandState.swift             # Tab models & presentation states
+│   │   │   ├── IslandCoordinator.swift      # Central state machine & HUD orchestrator
+│   │   │   └── IslandState.swift             # HUDPayload & 9 ExpandedTab definitions
 │   │   ├── Windowing/
 │   │   │   ├── IslandPanel.swift             # Non-activating floating NSPanel (.statusBar)
 │   │   │   ├── IslandWindowController.swift  # Notch positioning & screen geometry listener
 │   │   │   └── ScreenNotchDetector.swift     # Safe area insets & floating pill fallback
 │   │   ├── Services/
-│   │   │   ├── MediaService.swift            # Apple Music & Spotify notification observer
-│   │   │   ├── SystemControlService.swift    # CoreAudio volume & display brightness
+│   │   │   ├── SystemControlService.swift    # CoreAudio volume key listener & brightness
+│   │   │   ├── ClipboardHistoryService.swift # NSPasteboard history & search engine
+│   │   │   ├── AppLauncherService.swift      # Pinned apps & web bookmark manager
+│   │   │   ├── FocusNoteService.swift        # Focus headline goal & daily checklist
+│   │   │   ├── PresenceDetectionService.swift# Apple Vision on-device face detector
+│   │   │   ├── MediaService.swift            # Apple Music & Spotify observer
 │   │   │   ├── CalendarService.swift         # EventKit schedule & meeting URL parser
 │   │   │   ├── MirrorService.swift           # Low-latency camera check with safe cutoff
 │   │   │   ├── AudioActivityMonitor.swift    # Zero-TCC CoreAudio mic stream listener
@@ -216,6 +205,9 @@ OpenHalo/
 │   │   │   ├── TimerService.swift            # DispatchSource precision countdown engine
 │   │   │   └── FileShelfService.swift        # Drag-and-drop staging & AirDrop
 │   │   ├── Models/
+│   │   │   ├── ClipboardItem.swift           # Clip model with type auto-classification
+│   │   │   ├── LauncherShortcut.swift        # App & bookmark shortcut models
+│   │   │   ├── FocusTaskItem.swift           # Daily checklist item model
 │   │   │   ├── CalendarEventItem.swift       # Event models & regex meeting link detector
 │   │   │   ├── PillSlotConfig.swift          # Configurable Left/Right wing slot enums
 │   │   │   ├── MediaTrack.swift              # Audio track metadata & progress formatting
@@ -223,15 +215,19 @@ OpenHalo/
 │   │   │   └── ShelfItem.swift               # Staged file item with QuickLook icons
 │   │   ├── Views/
 │   │   │   ├── IslandRootView.swift          # Dynamic spring capsule container
-│   │   │   ├── CompactPillView.swift         # Configurable idle capsule pill
-│   │   │   ├── ExpandedCardView.swift        # 6-tab navigation deck
+│   │   │   ├── CompactPillView.swift         # Configurable idle capsule pill with focus ticker
+│   │   │   ├── MediaMateHUDView.swift        # Drop-down iOS volume & brightness pill slider
+│   │   │   ├── ExpandedCardView.swift        # 9-tab adaptive navigation deck
+│   │   │   ├── ClipboardExpandedView.swift   # Searchable clipboard history manager
+│   │   │   ├── LauncherExpandedView.swift    # Pinned app & web bookmark dock
+│   │   │   ├── FocusNoteExpandedView.swift   # Primary focus goal & checklist
 │   │   │   ├── MediaExpandedView.swift       # Media player + volume slider
 │   │   │   ├── CalendarExpandedView.swift    # Next meeting + 1-click video call join
-│   │   │   ├── MirrorExpandedView.swift      # Live camera mirror look
+│   │   │   ├── MirrorExpandedView.swift      # Live camera look & Vision presence
 │   │   │   ├── TimerExpandedView.swift       # Pomodoro presets & countdown ring
 │   │   │   ├── SystemHealthView.swift        # CPU/RAM/Battery + brightness slider
 │   │   │   ├── FileShelfView.swift           # Staged files + AirDrop
-│   │   │   └── SettingsView.swift            # Modern preferences window
+│   │   │   └── SettingsView.swift            # Preferences window & module toggles
 │   │   └── Utils/
 │   │       ├── AppleScriptRunner.swift       # Safe, asynchronous AppleScript executor
 │   │       └── SoundEffectManager.swift      # Native macOS audio alert player

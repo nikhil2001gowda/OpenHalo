@@ -47,3 +47,4 @@ Thank you for your interest in contributing to OpenHalo! We welcome community co
 2. Commit your changes with clear, descriptive messages.
 3. Verify that `swift run OpenHaloVerify` and `./scripts/build_app.sh` succeed without errors or warnings.
 4. Open a Pull Request on GitHub describing your motivation, changes, and screenshots/recordings if applicable.
+

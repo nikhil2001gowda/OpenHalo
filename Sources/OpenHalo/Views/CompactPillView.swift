@@ -28,6 +28,8 @@ public struct CompactPillView: View {
             nowPlayingLeading
         case .nextEvent:
             nextEventLeading
+        case .focusTask:
+            focusLeading
         case .timer:
             timerLeading
         case .clock:
@@ -57,6 +59,8 @@ public struct CompactPillView: View {
                 EmptyView()
             case .volume:
                 volumeTrailing
+            case .focusTask:
+                focusTrailing
             case .none:
                 EmptyView()
             }
@@ -172,6 +176,34 @@ public struct CompactPillView: View {
             Text("\(Int(coordinator.systemControls.volume * 100))%")
                 .font(.system(size: 9, weight: .bold, design: .rounded))
                 .foregroundColor(Color.white.opacity(0.7))
+        }
+    }
+
+    private var focusLeading: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "flag.fill")
+                .font(.system(size: 9))
+                .foregroundColor(.yellow)
+
+            Text(coordinator.focusService.currentFocusHeadline)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .frame(maxWidth: 80, alignment: .leading)
+        }
+    }
+
+    private var focusTrailing: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "flag.fill")
+                .font(.system(size: 9))
+                .foregroundColor(.yellow)
+
+            Text(coordinator.focusService.currentFocusHeadline)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(.white.opacity(0.85))
+                .lineLimit(1)
+                .frame(maxWidth: 65, alignment: .trailing)
         }
     }
 }

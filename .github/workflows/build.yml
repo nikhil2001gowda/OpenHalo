@@ -29,3 +29,4 @@ jobs:
           test -f build/OpenHalo.app/Contents/MacOS/OpenHalo
           test -f build/OpenHalo.app/Contents/Info.plist
           codesign --verify --verbose build/OpenHalo.app
+

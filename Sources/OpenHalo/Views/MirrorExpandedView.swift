@@ -4,13 +4,19 @@ import AppKit
 
 public struct MirrorExpandedView: View {
     @ObservedObject var mirrorService: MirrorService
+    @ObservedObject var presenceService: PresenceDetectionService
 
-    public init(mirrorService: MirrorService) {
+    @MainActor
+    public init(
+        mirrorService: MirrorService,
+        presenceService: PresenceDetectionService? = nil
+    ) {
         self.mirrorService = mirrorService
+        self.presenceService = presenceService ?? IslandCoordinator.shared.presenceService
     }
 
     public var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             if !mirrorService.hasPermission {
                 // Request Permission UI
                 VStack(spacing: 8) {
@@ -42,12 +48,12 @@ public struct MirrorExpandedView: View {
                     .buttonStyle(.plain)
                     .padding(.top, 4)
                 }
-                .padding(.vertical, 20)
+                .padding(.vertical, 16)
             } else {
                 // Live Camera View
                 ZStack {
                     CameraPreviewRepresentable(session: mirrorService.session)
-                        .frame(width: 280, height: 140)
+                        .frame(width: 280, height: 130)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -71,12 +77,48 @@ public struct MirrorExpandedView: View {
                             .clipShape(Capsule())
 
                             Spacer()
+
+                            // On-Device Vision Presence Trigger
+                            Button(action: {
+                                presenceService.performInstantPresenceCheck()
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: presenceService.isAnalyzing ? "sparkles" : "person.fill.viewfinder")
+                                        .font(.system(size: 9.5))
+                                    Text(presenceService.isAnalyzing ? "Scanning..." : "Vision Check")
+                                        .font(.system(size: 9.5, weight: .medium))
+                                }
+                                .foregroundColor(.cyan)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.black.opacity(0.65))
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
                         }
                         .padding(8)
+
                         Spacer()
+
+                        // Vision Result Toast
+                        if presenceService.isUserPresent || presenceService.facesDetectedCount > 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.shield.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.green)
+                                Text(presenceService.statusMessage)
+                                    .font(.system(size: 9.5, weight: .medium))
+                                    .foregroundColor(.white)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.black.opacity(0.75))
+                            .cornerRadius(6)
+                            .padding(.bottom, 6)
+                        }
                     }
                 }
-                .frame(width: 280, height: 140)
+                .frame(width: 280, height: 130)
 
                 // Bottom Camera Selector
                 HStack {
@@ -100,7 +142,7 @@ public struct MirrorExpandedView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
     }
 }
 
@@ -142,4 +184,3 @@ class CameraPreviewNSView: NSView {
         return layer
     }
 }
-

@@ -27,6 +27,9 @@ public struct IslandRootView: View {
                     if coordinator.state.isExpanded {
                         ExpandedCardView()
                             .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    } else if case .hud(let payload) = coordinator.state {
+                        MediaMateHUDView(payload: payload)
+                            .transition(.opacity)
                     } else {
                         CompactPillView()
                             .contentShape(Rectangle())
@@ -39,6 +42,7 @@ public struct IslandRootView: View {
             }
             .frame(width: currentWidth, height: currentHeight)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.state.isExpanded)
+            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.state.isHUD)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: coordinator.activeTab)
             .animation(.spring(response: 0.35, dampingFraction: 0.75), value: isDropTargeted)
             .onHover { hovering in
@@ -60,6 +64,9 @@ public struct IslandRootView: View {
         if coordinator.state.isExpanded {
             return 430
         }
+        if case .hud = coordinator.state {
+            return 230
+        }
         return 204
     }
 
@@ -75,7 +82,13 @@ public struct IslandRootView: View {
             case .timers: return 165
             case .system: return 175
             case .shelf: return 140
+            case .clipboard: return 165
+            case .launcher: return 145
+            case .focus: return 150
             }
+        }
+        if case .hud = coordinator.state {
+            return 36
         }
         return 34
     }
@@ -83,6 +96,9 @@ public struct IslandRootView: View {
     private var currentCornerRadius: CGFloat {
         if coordinator.state.isExpanded || isDropTargeted {
             return 26
+        }
+        if case .hud = coordinator.state {
+            return 18
         }
         return 17
     }

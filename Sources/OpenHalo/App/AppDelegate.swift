@@ -40,13 +40,22 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let timerItem = NSMenuItem(title: "Timers & Pomodoro", action: #selector(showTimerTab), keyEquivalent: "3")
         menu.addItem(timerItem)
 
-        let systemItem = NSMenuItem(title: "System Health & Brightness", action: #selector(showSystemTab), keyEquivalent: "4")
+        let focusItem = NSMenuItem(title: "Focus Task & Notes", action: #selector(showFocusTab), keyEquivalent: "4")
+        menu.addItem(focusItem)
+
+        let clipboardItem = NSMenuItem(title: "Clipboard History Manager", action: #selector(showClipboardTab), keyEquivalent: "5")
+        menu.addItem(clipboardItem)
+
+        let launcherItem = NSMenuItem(title: "App & Bookmark Launcher", action: #selector(showLauncherTab), keyEquivalent: "6")
+        menu.addItem(launcherItem)
+
+        let systemItem = NSMenuItem(title: "System Health & Brightness", action: #selector(showSystemTab), keyEquivalent: "7")
         menu.addItem(systemItem)
 
-        let shelfItem = NSMenuItem(title: "File Shelf & AirDrop", action: #selector(showShelfTab), keyEquivalent: "5")
+        let shelfItem = NSMenuItem(title: "File Shelf & AirDrop", action: #selector(showShelfTab), keyEquivalent: "8")
         menu.addItem(shelfItem)
 
-        let mirrorItem = NSMenuItem(title: "Quick Camera Mirror", action: #selector(showMirrorTab), keyEquivalent: "6")
+        let mirrorItem = NSMenuItem(title: "Quick Camera Mirror & Vision", action: #selector(showMirrorTab), keyEquivalent: "9")
         menu.addItem(mirrorItem)
 
         menu.addItem(NSMenuItem.separator())
@@ -83,6 +92,24 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showTimerTab() {
         Task { @MainActor in
             IslandCoordinator.shared.expandTo(tab: .timers)
+        }
+    }
+
+    @objc private func showFocusTab() {
+        Task { @MainActor in
+            IslandCoordinator.shared.expandTo(tab: .focus)
+        }
+    }
+
+    @objc private func showClipboardTab() {
+        Task { @MainActor in
+            IslandCoordinator.shared.expandTo(tab: .clipboard)
+        }
+    }
+
+    @objc private func showLauncherTab() {
+        Task { @MainActor in
+            IslandCoordinator.shared.expandTo(tab: .launcher)
         }
     }
 
