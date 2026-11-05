@@ -7,20 +7,28 @@ public final class IslandWindowController: NSObject, ObservableObject {
 
     public private(set) var panel: IslandPanel?
     private var screenChangeObserver: Any?
-    private var clickOutsideMonitor: Any?
+    private var clickOutsideGlobalMonitor: Any?
+    private var clickOutsideLocalMonitor: Any?
+    private var appActivationObserver: Any?
 
     public override init() {
         super.init()
         setupScreenChangeObserver()
-        setupGlobalClickOutsideMonitor()
+        setupClickOutsideMonitors()
     }
 
     deinit {
         if let observer = screenChangeObserver {
             NotificationCenter.default.removeObserver(observer)
         }
-        if let monitor = clickOutsideMonitor {
+        if let monitor = clickOutsideGlobalMonitor {
             NSEvent.removeMonitor(monitor)
+        }
+        if let monitor = clickOutsideLocalMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let observer = appActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
     }
 
@@ -77,26 +85,53 @@ public final class IslandWindowController: NSObject, ObservableObject {
         }
     }
 
-    private func setupGlobalClickOutsideMonitor() {
-        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(
+    private func setupClickOutsideMonitors() {
+        // 1. Global Monitor: Captures clicks outside OpenHalo when another application has focus
+        clickOutsideGlobalMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { _ in
+            Task { @MainActor in
+                let coordinator = IslandCoordinator.shared
+                if coordinator.state.isExpanded {
+                    coordinator.collapseToCompact()
+                }
+            }
+        }
+
+        // 2. Local Monitor: Captures clicks inside OpenHalo window
+        clickOutsideLocalMonitor = NSEvent.addLocalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown]
         ) { [weak self] event in
-            Task { @MainActor [weak self] in
-                guard let self = self, let panel = self.panel else { return }
+            guard let self = self, let panel = self.panel else { return event }
+            Task { @MainActor in
                 let coordinator = IslandCoordinator.shared
 
-                // Only dismiss when expanded
-                guard coordinator.state.isExpanded else { return }
+                if coordinator.state.isExpanded {
+                    let mouseLocation = NSEvent.mouseLocation
+                    let currentWidth = coordinator.currentIslandWidth
+                    let currentHeight = coordinator.currentIslandHeight
 
-                let mouseLocation = NSEvent.mouseLocation
-                let currentWidth = coordinator.currentIslandWidth
-                let currentHeight = coordinator.currentIslandHeight
+                    let minX = panel.frame.midX - (currentWidth / 2.0)
+                    let minY = panel.frame.maxY - currentHeight
+                    let islandScreenRect = NSRect(x: minX, y: minY, width: currentWidth, height: currentHeight)
 
-                let minX = panel.frame.midX - (currentWidth / 2.0)
-                let minY = panel.frame.maxY - currentHeight
-                let islandScreenRect = NSRect(x: minX, y: minY, width: currentWidth, height: currentHeight)
+                    if !islandScreenRect.contains(mouseLocation) {
+                        coordinator.collapseToCompact()
+                    }
+                }
+            }
+            return event
+        }
 
-                if !islandScreenRect.contains(mouseLocation) {
+        // 3. Workspace App Activation Observer: Auto-collapse if user activates any other app
+        appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                let coordinator = IslandCoordinator.shared
+                if coordinator.state.isExpanded {
                     coordinator.collapseToCompact()
                 }
             }
@@ -107,28 +142,22 @@ public final class IslandWindowController: NSObject, ObservableObject {
 /// Custom hosting view that allows mouse events to pass through transparent regions outside the visible island
 final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
     override func hitTest(_ point: NSPoint) -> NSView? {
+        // Convert window coordinate point to view local coordinate space (where isFlipped == true, y=0 is at the top)
+        let localPoint = convert(point, from: nil)
+
         let coordinator = IslandCoordinator.shared
         let currentWidth = coordinator.currentIslandWidth
         let currentHeight = coordinator.currentIslandHeight
 
         let minX = (bounds.width - currentWidth) / 2.0
-        let minY = bounds.height - currentHeight
+        let islandRect = NSRect(x: minX, y: 0, width: currentWidth, height: currentHeight)
 
-        let islandRect = NSRect(x: minX, y: minY, width: currentWidth, height: currentHeight)
-
-        // If clicking inside the visible island capsule, return self so clicks reach SwiftUI buttons!
-        if islandRect.contains(point) {
+        // If clicking inside the visible island capsule, return the view so SwiftUI buttons/sliders receive the event!
+        if islandRect.contains(localPoint) {
             return super.hitTest(point)
         }
 
-        // If clicking on empty background margins outside the island while expanded, collapse to compact!
-        if coordinator.state.isExpanded {
-            Task { @MainActor in
-                coordinator.collapseToCompact()
-            }
-        }
-
-        // Pass clicks through to apps underneath
+        // Outside the island capsule: pass clicks through to apps underneath (zero side effects in hitTest)
         return nil
     }
 }

@@ -72,7 +72,7 @@ public final class IslandCoordinator: ObservableObject {
 
     public var currentIslandHeight: CGFloat {
         if isDropHovered { return 120 }
-        let notchOffset: CGFloat = ScreenNotchDetector.detect().hasNotch ? 36 : 0
+        let notchOffset: CGFloat = ScreenNotchDetector.detect().hasNotch ? 40 : 0
         if state.isExpanded {
             switch activeTab {
             case .mirror: return 215 + notchOffset
