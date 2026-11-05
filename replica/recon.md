@@ -99,3 +99,4 @@ As explicitly requested:
 5. **Things 3 & CleanMyMac**: Proprietary commercial apps requiring paid software licenses ($50+).
 6. **Synced Lyrics (Musixmatch / Genius)**: Paid commercial licensing APIs that ban unauthorized desktop scraping.
 7. **Per-App Audio Volume**: Requires low-level kernel audio driver extension (HAL audio plugin) which requires special Apple Developer Kernel Extension entitlements and degrades system audio latency.
+

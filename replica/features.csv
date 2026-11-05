@@ -67,3 +67,4 @@ Spotify,media,must,yes,yes,Spotify playback controls and track information
 Finder Services,finder,should,yes,yes,Right-click Send to OpenHalo file tray
 Alfred Workflow,launcher,should,yes,yes,CLI file shelf staging command
 Remove Background,vision,must,yes,yes,Offline AI image background removal via Vision segmentation
+

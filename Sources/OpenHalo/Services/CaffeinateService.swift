@@ -64,3 +64,4 @@ public final class CaffeinateService: ObservableObject {
         remainingMinutes = 0
     }
 }
+

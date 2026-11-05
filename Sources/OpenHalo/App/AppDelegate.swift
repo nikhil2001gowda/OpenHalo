@@ -15,6 +15,57 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Launch Dynamic Island window
         IslandWindowController.shared.showIsland(with: AnyView(IslandRootView()))
+
+        // Setup global keyboard shortcuts
+        setupKeyboardShortcuts()
+    }
+
+    private var globalKeyMonitor: Any?
+    private var localKeyMonitor: Any?
+
+    private func setupKeyboardShortcuts() {
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.handleKeyEvent(event)
+        }
+
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if self?.handleKeyEvent(event) == true {
+                return nil
+            }
+            return event
+        }
+    }
+
+    @discardableResult
+    private func handleKeyEvent(_ event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let chars = event.charactersIgnoringModifiers?.lowercased()
+
+        // 1. Command + Shift + V -> Open Clipboard History
+        if flags == [.command, .shift] && chars == "v" {
+            Task { @MainActor in
+                IslandCoordinator.shared.expandTo(tab: .clipboard)
+            }
+            return true
+        }
+
+        // 2. Command + Shift + M -> Open Media Player
+        if flags == [.command, .shift] && chars == "m" {
+            Task { @MainActor in
+                IslandCoordinator.shared.expandTo(tab: .media)
+            }
+            return true
+        }
+
+        // 3. Option + Space -> Toggle Island / Launcher
+        if flags == .option && event.keyCode == 49 { // 49 is Spacebar
+            Task { @MainActor in
+                IslandCoordinator.shared.toggleExpanded()
+            }
+            return true
+        }
+
+        return false
     }
 
     private func setupStatusBarItem() {

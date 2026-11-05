@@ -33,3 +33,4 @@ public enum DeveloperToolsService {
         return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
 }
+

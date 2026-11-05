@@ -1,6 +1,9 @@
 import Foundation
+import AppKit
 
 public enum ClipboardItemType: String, Sendable, CaseIterable {
+    case all = "All"
+    case image = "Image"
     case text = "Text"
     case url = "Link"
     case color = "Color"
@@ -13,27 +16,47 @@ public struct ClipboardItem: Identifiable, Equatable, Sendable {
     public let timestamp: Date
     public let type: ClipboardItemType
     public let characterCount: Int
+    public let imageData: Data?
+    public var isPinned: Bool
 
-    public init(id: UUID = UUID(), content: String, timestamp: Date = Date()) {
+    public init(
+        id: UUID = UUID(),
+        content: String,
+        timestamp: Date = Date(),
+        type: ClipboardItemType? = nil,
+        imageData: Data? = nil,
+        isPinned: Bool = false
+    ) {
         self.id = id
         self.content = content
         self.timestamp = timestamp
         self.characterCount = content.count
+        self.imageData = imageData
+        self.isPinned = isPinned
 
-        // Automatic content classification
-        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
-            self.type = .url
-        } else if trimmed.hasPrefix("#") && (trimmed.count == 4 || trimmed.count == 7 || trimmed.count == 9) {
-            self.type = .color
-        } else if trimmed.contains("func ") || trimmed.contains("import ") || trimmed.contains("class ") || trimmed.contains("let ") || trimmed.contains("var ") {
-            self.type = .code
+        if let explicitType = type {
+            self.type = explicitType
+        } else if imageData != nil {
+            self.type = .image
         } else {
-            self.type = .text
+            // Automatic content classification
+            let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+                self.type = .url
+            } else if trimmed.hasPrefix("#") && (trimmed.count == 4 || trimmed.count == 7 || trimmed.count == 9) {
+                self.type = .color
+            } else if trimmed.contains("func ") || trimmed.contains("import ") || trimmed.contains("class ") || trimmed.contains("let ") || trimmed.contains("var ") || trimmed.contains("def ") || trimmed.contains("return ") {
+                self.type = .code
+            } else {
+                self.type = .text
+            }
         }
     }
 
     public var preview: String {
+        if type == .image {
+            return content
+        }
         let singleLine = content.replacingOccurrences(of: "\n", with: " ")
         if singleLine.count > 50 {
             return String(singleLine.prefix(47)) + "..."
@@ -52,4 +75,3 @@ public struct ClipboardItem: Identifiable, Equatable, Sendable {
         }
     }
 }
-
