@@ -72,6 +72,7 @@ public final class WeatherService: ObservableObject {
     private var lastFetchTime: Date? = nil
 
     public init() {
+        // Clear old stale "San Francisco" defaults
         if let savedCity = UserDefaults.standard.string(forKey: userDefaultsCityKey),
            savedCity != "San Francisco" && !savedCity.isEmpty {
             self.cityName = savedCity
@@ -81,9 +82,48 @@ public final class WeatherService: ObservableObject {
                 await fetchWeather()
             }
         } else {
+            // Apply smart timezone fallback first so UI is immediately accurate
+            applyTimezoneFallback()
             Task {
                 await autoDetectLocation()
             }
+        }
+    }
+
+    private func applyTimezoneFallback() {
+        let tzId = TimeZone.current.identifier
+        if tzId.contains("Kolkata") || tzId.contains("India") || tzId.contains("Calcutta") {
+            self.cityName = "Bengaluru"
+            self.latitude = 12.9716
+            self.longitude = 77.5946
+        } else if tzId.contains("New_York") {
+            self.cityName = "New York"
+            self.latitude = 40.7128
+            self.longitude = -74.0060
+        } else if tzId.contains("London") {
+            self.cityName = "London"
+            self.latitude = 51.5074
+            self.longitude = -0.1278
+        } else if tzId.contains("Tokyo") {
+            self.cityName = "Tokyo"
+            self.latitude = 35.6762
+            self.longitude = 139.6503
+        } else if tzId.contains("Singapore") {
+            self.cityName = "Singapore"
+            self.latitude = 1.3521
+            self.longitude = 103.8198
+        } else if tzId.contains("Dubai") {
+            self.cityName = "Dubai"
+            self.latitude = 25.2048
+            self.longitude = 55.2708
+        } else if tzId.contains("Sydney") {
+            self.cityName = "Sydney"
+            self.latitude = -33.8688
+            self.longitude = 151.2093
+        } else if tzId.contains("Berlin") || tzId.contains("Paris") {
+            self.cityName = "Berlin"
+            self.latitude = 52.5200
+            self.longitude = 13.4050
         }
     }
 
@@ -91,21 +131,22 @@ public final class WeatherService: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        // 1. Primary: ip-api.com
-        if let url = URL(string: "http://ip-api.com/json/"),
+        // 1. Primary: ipwho.is (HTTPS, fast, accurate city/coordinates, no API key)
+        if let url = URL(string: "https://ipwho.is/"),
            let (data, response) = try? await URLSession.shared.data(from: url),
            let http = response as? HTTPURLResponse, http.statusCode == 200,
-           let json = try? JSONDecoder().decode(IPLocationResponse.self, from: data),
-           json.status.lowercased() == "success" {
-            self.cityName = json.city
-            self.latitude = json.lat
-            self.longitude = json.lon
-            saveLocation(name: json.city, lat: json.lat, lon: json.lon)
+           let json = try? JSONDecoder().decode(IPWhoIsResponse.self, from: data),
+           json.success == true {
+            let detectedCity = json.city.isEmpty ? "Current Location" : json.city
+            self.cityName = detectedCity
+            self.latitude = json.latitude
+            self.longitude = json.longitude
+            saveLocation(name: detectedCity, lat: json.latitude, lon: json.longitude)
             await fetchWeather(force: true)
             return
         }
 
-        // 2. Fallback: freeipapi.com
+        // 2. Secondary: freeipapi.com (HTTPS)
         if let fallbackURL = URL(string: "https://freeipapi.com/api/json"),
            let (data, response) = try? await URLSession.shared.data(from: fallbackURL),
            let http = response as? HTTPURLResponse, http.statusCode == 200,
@@ -119,12 +160,22 @@ public final class WeatherService: ObservableObject {
             return
         }
 
-        // 3. Fallback to existing or Bengaluru
-        if self.cityName == "Locating..." {
-            self.cityName = "Bengaluru"
-            self.latitude = 12.9716
-            self.longitude = 77.5946
+        // 3. Fallback: BigDataCloud client reverse geocoding
+        if let bdcURL = URL(string: "https://api.bigdatacloud.net/data/reverse-geocode-client"),
+           let (data, response) = try? await URLSession.shared.data(from: bdcURL),
+           let http = response as? HTTPURLResponse, http.statusCode == 200,
+           let json = try? JSONDecoder().decode(BigDataCloudResponse.self, from: data) {
+            let name = json.city.isEmpty ? (json.locality.isEmpty ? "Current Location" : json.locality) : json.city
+            self.cityName = name
+            self.latitude = json.latitude
+            self.longitude = json.longitude
+            saveLocation(name: name, lat: json.latitude, lon: json.longitude)
+            await fetchWeather(force: true)
+            return
         }
+
+        // 4. Default timezone fallback
+        applyTimezoneFallback()
         await fetchWeather(force: true)
     }
 
@@ -285,6 +336,20 @@ public final class WeatherService: ObservableObject {
 }
 
 // Schemas
+private struct IPWhoIsResponse: Codable {
+    let success: Bool
+    let city: String
+    let latitude: Double
+    let longitude: Double
+}
+
+private struct BigDataCloudResponse: Codable {
+    let city: String
+    let locality: String
+    let latitude: Double
+    let longitude: Double
+}
+
 private struct IPLocationResponse: Codable {
     let status: String
     let city: String

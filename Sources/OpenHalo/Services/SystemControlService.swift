@@ -14,8 +14,9 @@ public final class SystemControlService: ObservableObject {
 
     private var currentOutputDeviceID: AudioDeviceID = 0
     private var syncTimer: Timer?
+    private var lastUserAdjustmentDate: Date = .distantPast
 
-    // Private DisplayServices Dynamic Function Pointers
+    // Private DisplayServices Dynamic Function Pointers (macOS System Settings perceived brightness)
     private typealias GetBrightnessFunc = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
     private typealias SetBrightnessFunc = @convention(c) (CGDirectDisplayID, Float) -> Int32
     private var getBrightnessPointer: GetBrightnessFunc?
@@ -38,10 +39,11 @@ public final class SystemControlService: ObservableObject {
 
     private func setupDisplayServices() {
         if let handle = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_NOW) {
-            if let getSym = dlsym(handle, "DisplayServicesGetLinearBrightness") {
+            // Prefer user-perceived DisplayServicesGetBrightness/SetBrightness (exact match with macOS Control Center & F1/F2 keys)
+            if let getSym = dlsym(handle, "DisplayServicesGetBrightness") ?? dlsym(handle, "DisplayServicesGetLinearBrightness") {
                 getBrightnessPointer = unsafeBitCast(getSym, to: GetBrightnessFunc.self)
             }
-            if let setSym = dlsym(handle, "DisplayServicesSetLinearBrightness") {
+            if let setSym = dlsym(handle, "DisplayServicesSetBrightness") ?? dlsym(handle, "DisplayServicesSetLinearBrightness") {
                 setBrightnessPointer = unsafeBitCast(setSym, to: SetBrightnessFunc.self)
             }
         }
@@ -65,12 +67,15 @@ public final class SystemControlService: ObservableObject {
     }
 
     private func syncHardwareState() {
+        // Debounce: If user is actively dragging the slider, do not overwrite mid-drag
+        guard Date().timeIntervalSince(lastUserAdjustmentDate) > 1.2 else { return }
+
         // 1. Sync Brightness
         if let fn = getBrightnessPointer {
             var currentHardwareB: Float = 0.0
             if fn(CGMainDisplayID(), &currentHardwareB) == 0 {
                 let clamped = max(0.0, min(1.0, currentHardwareB))
-                if abs(clamped - self.brightness) > 0.015 {
+                if abs(clamped - self.brightness) > 0.02 {
                     self.brightness = clamped
                     self.onBrightnessChanged?(clamped)
                 }
@@ -79,7 +84,7 @@ public final class SystemControlService: ObservableObject {
 
         // 2. Sync Volume
         let currentHardwareVol = getHardwareVolumeScalar()
-        if abs(currentHardwareVol - self.volume) > 0.015 {
+        if abs(currentHardwareVol - self.volume) > 0.02 {
             self.volume = currentHardwareVol
             self.onVolumeChanged?(currentHardwareVol, self.isMuted)
         }
@@ -99,6 +104,7 @@ public final class SystemControlService: ObservableObject {
     }
 
     public func setBrightness(_ newBrightness: Float) {
+        lastUserAdjustmentDate = Date()
         let clamped = max(0.0, min(1.0, newBrightness))
         self.brightness = clamped
 
@@ -231,6 +237,7 @@ public final class SystemControlService: ObservableObject {
     }
 
     public func setVolume(_ newVolume: Float) {
+        lastUserAdjustmentDate = Date()
         let clamped = max(0.0, min(1.0, newVolume))
         self.volume = clamped
 
@@ -275,12 +282,12 @@ public final class SystemControlService: ObservableObject {
                 mElement: 2
             )
             _ = AudioObjectSetPropertyData(defaultOutputDevice, &ch2Address, 0, nil, volumeSize, &volumeScalar)
-        }
-
-        // AppleScript fallback
-        let volumePercent = Int(clamped * 100)
-        Task {
-            await AppleScriptRunner.run("set volume output volume \(volumePercent)")
+        } else {
+            // AppleScript fallback only if CoreAudio device lookup failed
+            let volumePercent = Int(clamped * 100)
+            Task {
+                await AppleScriptRunner.run("set volume output volume \(volumePercent)")
+            }
         }
 
         self.onVolumeChanged?(clamped, self.isMuted)

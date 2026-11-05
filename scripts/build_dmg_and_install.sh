@@ -54,6 +54,11 @@ cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
     <key>NSAppleEventsUsageDescription</key>
     <string>OpenHalo interacts with Apple Music and Spotify to display now playing information and transport controls.</string>
     <key>NSCameraUsageDescription</key>

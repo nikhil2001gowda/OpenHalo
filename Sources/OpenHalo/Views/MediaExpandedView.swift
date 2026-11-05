@@ -12,7 +12,8 @@ public struct MediaExpandedView: View {
 
     private var isTrackActive: Bool {
         !mediaService.currentTrack.title.isEmpty &&
-        mediaService.currentTrack.title != "Unknown Title"
+        mediaService.currentTrack.title != "Unknown Title" &&
+        mediaService.currentTrack.title != "No Media Playing"
     }
 
     public var body: some View {

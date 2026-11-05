@@ -298,12 +298,15 @@ public final class MediaService: ObservableObject {
 
     public func checkActivePlayers() {
         Task.detached(priority: .userInitiated) {
+            let isSystemAudioActive = Self.isSystemAudioOutputting()
+
             // 1. Check Apple Music
             if Self.isAppRunning(bundleID: "com.apple.Music") {
                 let script = """
                 tell application id "com.apple.Music"
-                    if player state is playing then
-                        return "Music|playing|" & (name of current track) & "|" & (artist of current track) & "|" & (duration of current track) & "|" & (player position)
+                    if exists current track then
+                        set pState to player state as string
+                        return "Music|" & pState & "|" & (name of current track) & "|" & (artist of current track) & "|" & (duration of current track) & "|" & (player position)
                     end if
                 end tell
                 return "none"
@@ -318,8 +321,9 @@ public final class MediaService: ObservableObject {
             if Self.isAppRunning(bundleID: "com.spotify.client") {
                 let script = """
                 tell application id "com.spotify.client"
-                    if player state is playing then
-                        return "Spotify|playing|" & (name of current track) & "|" & (artist of current track) & "|" & ((duration of current track) / 1000) & "|" & (player position)
+                    if exists current track then
+                        set pState to player state as string
+                        return "Spotify|" & pState & "|" & (name of current track) & "|" & (artist of current track) & "|" & ((duration of current track) / 1000) & "|" & (player position)
                     end if
                 end tell
                 return "none"
@@ -346,7 +350,7 @@ public final class MediaService: ObservableObject {
                 return "none"
                 """
                 if let output = await AppleScriptRunner.run(script), output != "none" {
-                    await self.parseBrowserMedia(output: output, browserName: "Google Chrome")
+                    await self.parseBrowserMedia(output: output, browserName: "Google Chrome", isAudible: isSystemAudioActive)
                     return
                 }
             }
@@ -367,7 +371,7 @@ public final class MediaService: ObservableObject {
                 return "none"
                 """
                 if let output = await AppleScriptRunner.run(script), output != "none" {
-                    await self.parseBrowserMedia(output: output, browserName: "Safari")
+                    await self.parseBrowserMedia(output: output, browserName: "Safari", isAudible: isSystemAudioActive)
                     return
                 }
             }
@@ -391,10 +395,7 @@ public final class MediaService: ObservableObject {
             }
 
             // 6. Generic Audio Check: Is system outputting audio?
-            let isAudioOutputting = Self.isSystemAudioOutputting()
-            if isAudioOutputting {
-                // If audio is actively playing through speakers but neither Music/Spotify/Chrome tab was matched,
-                // keep current track active or display System Audio
+            if isSystemAudioActive {
                 await MainActor.run {
                     if !self.currentTrack.title.isEmpty && self.currentTrack.title != "No Media Playing" {
                         self.currentTrack.playbackState = .playing
@@ -402,17 +403,22 @@ public final class MediaService: ObservableObject {
                     }
                 }
             } else {
-                // Audio has stopped
+                // Audio has stopped & no player has an active track
                 await MainActor.run {
                     if self.currentTrack.source != .appleMusic && self.currentTrack.source != .spotify {
+                        self.currentTrack = MediaTrack()
+                        self.isAvailable = false
+                        self.updateProgressTimer()
+                    } else if self.currentTrack.playbackState == .playing {
                         self.currentTrack.playbackState = .paused
+                        self.updateProgressTimer()
                     }
                 }
             }
         }
     }
 
-    private func parseBrowserMedia(output: String, browserName: String) {
+    private func parseBrowserMedia(output: String, browserName: String, isAudible: Bool) {
         let parts = output.components(separatedBy: "|||")
         guard parts.count >= 2 else { return }
 
@@ -451,10 +457,10 @@ public final class MediaService: ObservableObject {
             album: "",
             duration: 0,
             position: 0,
-            playbackState: .playing,
+            playbackState: isAudible ? .playing : .paused,
             source: source
         )
-        self.isAvailable = true
+        self.isAvailable = isAudible
         self.updateProgressTimer()
     }
 
@@ -476,6 +482,8 @@ public final class MediaService: ObservableObject {
         let parts = output.components(separatedBy: "|")
         if parts.count >= 6 {
             let source: MusicSource = (parts[0] == "Spotify") ? .spotify : .appleMusic
+            let stateStr = parts[1].lowercased()
+            let isPlaying = (stateStr == "playing")
             let title = parts[2]
             let artist = parts[3]
             let duration = Double(parts[4]) ?? 0
@@ -487,10 +495,10 @@ public final class MediaService: ObservableObject {
                 album: "",
                 duration: duration,
                 position: position,
-                playbackState: .playing,
+                playbackState: isPlaying ? .playing : .paused,
                 source: source
             )
-            self.isAvailable = true
+            self.isAvailable = isPlaying
             self.updateProgressTimer()
         }
     }

@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import SwiftUI
 
+@MainActor
 public final class IslandWindowController: NSObject, ObservableObject {
     public static let shared = IslandWindowController()
 
@@ -60,19 +61,30 @@ public final class IslandWindowController: NSObject, ObservableObject {
 
     public func reposition() {
         guard let panel = panel else { return }
+        let isExpanded = IslandCoordinator.shared.state.isExpanded
+        updateFrameForState(isExpanded: isExpanded)
+    }
+
+    public func updateFrameForState(isExpanded: Bool) {
+        guard let panel = panel else { return }
         let geometry = ScreenNotchDetector.detect()
-        let maxPanelWidth: CGFloat = 520
-        let maxPanelHeight: CGFloat = 340
-
         let screenFrame = geometry.screenFrame
-        let originX = screenFrame.midX - (maxPanelWidth / 2.0)
-        let originY = screenFrame.maxY - maxPanelHeight
 
-        panel.setFrame(
-            NSRect(x: originX, y: originY, width: maxPanelWidth, height: maxPanelHeight),
-            display: true,
-            animate: false
-        )
+        if isExpanded {
+            // Full screen transparent canvas to capture clicks outside anywhere on the display
+            panel.setFrame(screenFrame, display: true, animate: false)
+        } else {
+            let maxPanelWidth: CGFloat = 520
+            let maxPanelHeight: CGFloat = 340
+            let originX = screenFrame.midX - (maxPanelWidth / 2.0)
+            let originY = screenFrame.maxY - maxPanelHeight
+
+            panel.setFrame(
+                NSRect(x: originX, y: originY, width: maxPanelWidth, height: maxPanelHeight),
+                display: true,
+                animate: false
+            )
+        }
     }
 
     private func setupScreenChangeObserver() {
@@ -157,7 +169,38 @@ final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
             return super.hitTest(point)
         }
 
-        // Outside the island capsule: pass clicks through to apps underneath (zero side effects in hitTest)
+        // When expanded, intercept clicks outside the island capsule to dismiss immediately
+        if coordinator.state.isExpanded {
+            return self
+        }
+
+        // When compact, pass clicks through to apps underneath (zero side effects in hitTest)
         return nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let coordinator = IslandCoordinator.shared
+        if coordinator.state.isExpanded {
+            let localPoint = convert(event.locationInWindow, from: nil)
+            let currentWidth = coordinator.currentIslandWidth
+            let currentHeight = coordinator.currentIslandHeight
+            let minX = (bounds.width - currentWidth) / 2.0
+            let islandRect = NSRect(x: minX, y: 0, width: currentWidth, height: currentHeight)
+
+            if !islandRect.contains(localPoint) {
+                coordinator.collapseToCompact()
+                return
+            }
+        }
+        super.mouseDown(with: event)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        let coordinator = IslandCoordinator.shared
+        if coordinator.state.isExpanded {
+            coordinator.collapseToCompact()
+            return
+        }
+        super.rightMouseDown(with: event)
     }
 }

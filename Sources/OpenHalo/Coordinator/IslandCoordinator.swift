@@ -23,7 +23,7 @@ public final class IslandCoordinator: ObservableObject {
 
     // Preferences
     @Published public var displayMode: IslandDisplayMode = .autoDetect
-    @Published public var autoCollapseDelay: Double = 3.5
+    @Published public var autoCollapseDelay: Double = 1.2
     @Published public var enableMediaModule: Bool = true
     @Published public var enableCalendarModule: Bool = true
     @Published public var enableTimerModule: Bool = true
@@ -233,6 +233,8 @@ public final class IslandCoordinator: ObservableObject {
         }
 
         self.activeTab = tab
+        IslandWindowController.shared.updateFrameForState(isExpanded: true)
+
         withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
             self.state = .expanded(tab)
         }
@@ -261,6 +263,8 @@ public final class IslandCoordinator: ObservableObject {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
             self.state = .compact
         }
+
+        IslandWindowController.shared.updateFrameForState(isExpanded: false)
     }
 
     public func toggleExpanded() {

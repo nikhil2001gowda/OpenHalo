@@ -25,18 +25,24 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupKeyboardShortcuts() {
         globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyEvent(event)
+            Task { @MainActor [weak self] in
+                self?.handleKeyEvent(event)
+            }
         }
 
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if self?.handleKeyEvent(event) == true {
-                return nil
+            // Handle synchronously on main thread for local window events
+            if let self = self {
+                if MainActor.assumeIsolated({ self.handleKeyEvent(event) }) {
+                    return nil
+                }
             }
             return event
         }
     }
 
     @discardableResult
+    @MainActor
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let chars = event.charactersIgnoringModifiers?.lowercased()
@@ -63,6 +69,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 IslandCoordinator.shared.toggleExpanded()
             }
             return true
+        }
+
+        // 4. Escape -> Immediate Collapse to Compact
+        if event.keyCode == 53 { // 53 is Escape
+            if IslandCoordinator.shared.state.isExpanded {
+                Task { @MainActor in
+                    IslandCoordinator.shared.collapseToCompact()
+                }
+                return true
+            }
         }
 
         return false
