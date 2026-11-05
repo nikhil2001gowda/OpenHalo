@@ -5,8 +5,13 @@ import AppKit
 public final class FileShelfService: ObservableObject {
     @Published public var items: [ShelfItem] = []
     @Published public var isDropTargetActive: Bool = false
+    @Published public var conversionStatusMessage: String? = nil
 
-    public init() {}
+    private let persistenceKey = "OpenHalo.FileShelf.StagedPaths"
+
+    public init() {
+        restoreShelfState()
+    }
 
     public func addFiles(_ urls: [URL]) {
         for url in urls {
@@ -18,15 +23,18 @@ public final class FileShelfService: ObservableObject {
         }
         if !urls.isEmpty {
             SoundEffectManager.playDropStash()
+            saveShelfState()
         }
     }
 
     public func removeItem(id: UUID) {
         items.removeAll(where: { $0.id == id })
+        saveShelfState()
     }
 
     public func clearAll() {
         items.removeAll()
+        saveShelfState()
     }
 
     public func openFile(_ item: ShelfItem) {
@@ -35,6 +43,25 @@ public final class FileShelfService: ObservableObject {
 
     public func revealInFinder(_ item: ShelfItem) {
         NSWorkspace.shared.activateFileViewerSelecting([item.url])
+    }
+
+    // MARK: - Reboot Persistence
+
+    private func saveShelfState() {
+        let paths = items.map { $0.url.path }
+        UserDefaults.standard.set(paths, forKey: persistenceKey)
+    }
+
+    private func restoreShelfState() {
+        guard let paths = UserDefaults.standard.stringArray(forKey: persistenceKey) else { return }
+        var restored: [ShelfItem] = []
+        for path in paths {
+            if FileManager.default.fileExists(atPath: path) {
+                let url = URL(fileURLWithPath: path)
+                restored.append(ShelfItem(url: url))
+            }
+        }
+        self.items = restored
     }
 
     // MARK: - Native AirDrop & Sharing Features
@@ -60,5 +87,41 @@ public final class FileShelfService: ObservableObject {
     public func shareItem(_ item: ShelfItem, from view: NSView) {
         let picker = NSSharingServicePicker(items: [item.url])
         picker.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+    }
+
+    // MARK: - SIPS Quick Image Conversion
+
+    public func convertItem(_ item: ShelfItem, to format: SIPSImageFormat) async {
+        do {
+            conversionStatusMessage = "Converting to \(format.displayName)..."
+            let targetURL = try await SIPSConversionService.shared.convert(inputURL: item.url, to: format)
+            addFiles([targetURL])
+            conversionStatusMessage = "Converted: \(targetURL.lastPathComponent)"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+                self?.conversionStatusMessage = nil
+            }
+        } catch {
+            conversionStatusMessage = "Conversion failed: \(error.localizedDescription)"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.conversionStatusMessage = nil
+            }
+        }
+    }
+
+    public func downscaleItem(_ item: ShelfItem, maxDimension: Int) async {
+        do {
+            conversionStatusMessage = "Rescaling to \(maxDimension)px..."
+            let targetURL = try await SIPSConversionService.shared.downscale(inputURL: item.url, maxDimension: maxDimension)
+            addFiles([targetURL])
+            conversionStatusMessage = "Rescaled: \(targetURL.lastPathComponent)"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+                self?.conversionStatusMessage = nil
+            }
+        } catch {
+            conversionStatusMessage = "Rescaling failed: \(error.localizedDescription)"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.conversionStatusMessage = nil
+            }
+        }
     }
 }

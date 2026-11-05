@@ -53,6 +53,10 @@ public final class SystemControlService: ObservableObject {
         }
     }
 
+    public func stopHardwareVolumeListener() {
+        isObserving = false
+    }
+
     private func registerVolumeListener(for deviceID: AudioDeviceID) {
         var volumeAddress = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyVolumeScalar,

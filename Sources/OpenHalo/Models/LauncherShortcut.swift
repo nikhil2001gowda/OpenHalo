@@ -30,3 +30,4 @@ public struct LauncherShortcut: Identifiable, Equatable, Sendable, Codable {
         LauncherShortcut(name: "Google", target: "https://google.com", type: .url, sfSymbol: "magnifyingglass")
     ]
 }
+

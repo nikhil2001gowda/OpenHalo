@@ -28,6 +28,7 @@ public final class IslandCoordinator: ObservableObject {
     @Published public var enableCalendarModule: Bool = true
     @Published public var enableTimerModule: Bool = true
     @Published public var enableFocusModule: Bool = true
+    @Published public var enableWeatherModule: Bool = true
     @Published public var enableClipboardModule: Bool = true
     @Published public var enableLauncherModule: Bool = true
     @Published public var enableSystemModule: Bool = true
@@ -35,6 +36,7 @@ public final class IslandCoordinator: ObservableObject {
     @Published public var enableMirrorModule: Bool = true
     @Published public var enableMicIndicator: Bool = true
     @Published public var enableHUDOverlay: Bool = true
+    @Published public var enableFaceLockModule: Bool = false
 
     // Pill Wing Slots Configuration
     @Published public var leadingSlot: PillLeadingSlot = .auto
@@ -54,6 +56,10 @@ public final class IslandCoordinator: ObservableObject {
     public let appLauncherService = AppLauncherService()
     public let focusService = FocusNoteService()
     public let presenceService = PresenceDetectionService()
+    public let weatherService = WeatherService.shared
+    public let powerSuspension = PowerSuspensionCoordinator.shared
+    public let launchAtLogin = LaunchAtLoginService.shared
+    public let screenLockFaceService = ScreenLockFaceService.shared
 
     private var autoCollapseWorkItem: DispatchWorkItem?
     private var hudDismissWorkItem: DispatchWorkItem?

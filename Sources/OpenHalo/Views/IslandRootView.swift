@@ -85,6 +85,7 @@ public struct IslandRootView: View {
             case .clipboard: return 165
             case .launcher: return 145
             case .focus: return 150
+            case .weather: return 145
             }
         }
         if case .hud = coordinator.state {

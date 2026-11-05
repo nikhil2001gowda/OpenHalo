@@ -23,6 +23,13 @@ public struct FileShelfView: View {
 
                 Spacer()
 
+                if let status = fileShelfService.conversionStatusMessage {
+                    Text(status)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.orange)
+                        .transition(.opacity)
+                }
+
                 if !fileShelfService.items.isEmpty {
                     HStack(spacing: 6) {
                         // AirDrop All
@@ -63,7 +70,7 @@ public struct FileShelfView: View {
                         .font(.system(size: 24))
                         .foregroundColor(Color.white.opacity(0.35))
 
-                    Text("Drag & drop files here to stash or AirDrop")
+                    Text("Drag & drop files here to stash, AirDrop, or SIPS convert")
                         .font(.system(size: 11))
                         .foregroundColor(Color.white.opacity(0.5))
                 }
@@ -140,10 +147,49 @@ public struct FileShelfView: View {
             Button("Reveal in Finder") {
                 fileShelfService.revealInFinder(item)
             }
+
+            if isImageFile(item.url) {
+                Divider()
+                Menu("SIPS Convert Image") {
+                    Button("Convert to PNG") {
+                        Task { await fileShelfService.convertItem(item, to: .png) }
+                    }
+                    Button("Convert to JPEG") {
+                        Task { await fileShelfService.convertItem(item, to: .jpeg) }
+                    }
+                    Button("Convert to WebP") {
+                        Task { await fileShelfService.convertItem(item, to: .webp) }
+                    }
+                    Button("Convert to HEIC") {
+                        Task { await fileShelfService.convertItem(item, to: .heic) }
+                    }
+                    Button("Convert to TIFF") {
+                        Task { await fileShelfService.convertItem(item, to: .tiff) }
+                    }
+                }
+
+                Menu("SIPS Resize") {
+                    Button("Downscale to 1920px") {
+                        Task { await fileShelfService.downscaleItem(item, maxDimension: 1920) }
+                    }
+                    Button("Downscale to 1280px") {
+                        Task { await fileShelfService.downscaleItem(item, maxDimension: 1280) }
+                    }
+                    Button("Downscale to 800px") {
+                        Task { await fileShelfService.downscaleItem(item, maxDimension: 800) }
+                    }
+                }
+            }
+
             Divider()
             Button("Remove from Shelf") {
                 fileShelfService.removeItem(id: item.id)
             }
         }
+    }
+
+    private func isImageFile(_ url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        return ["png", "jpg", "jpeg", "webp", "heic", "tiff", "gif", "bmp"].contains(ext)
     }
 }

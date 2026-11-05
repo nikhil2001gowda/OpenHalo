@@ -56,3 +56,4 @@ public final class AppLauncherService: ObservableObject {
         saveShortcuts()
     }
 }
+

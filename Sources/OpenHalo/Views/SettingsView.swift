@@ -1,7 +1,12 @@
 import SwiftUI
+import ServiceManagement
 
 public struct SettingsView: View {
     @ObservedObject var coordinator = IslandCoordinator.shared
+    @ObservedObject var loginService = LaunchAtLoginService.shared
+    @ObservedObject var faceService = ScreenLockFaceService.shared
+    @ObservedObject var powerCoordinator = PowerSuspensionCoordinator.shared
+    @ObservedObject var weatherService = WeatherService.shared
 
     public init() {}
 
@@ -38,6 +43,74 @@ public struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.radioGroup)
+                }
+
+                Divider()
+
+                // Boot & Power Management (Glance-Style Zero CPU Engine)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("System Lifecycle & Power Preservation")
+                        .font(.system(size: 12, weight: .semibold))
+
+                    Toggle("Launch OpenHalo at Login (macOS SMAppService)", isOn: $loginService.isEnabled)
+                        .toggleStyle(.checkbox)
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "bolt.badge.clock.fill")
+                            .foregroundColor(.green)
+                            .font(.system(size: 12))
+
+                        Text("Glance Low-Power Engine: Active (Freezes all Mach/HAL loops during sleep. Sleep events: \(powerCoordinator.sleepCount))")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Divider()
+
+                // Lock Screen Face ID Assistant (5-Second Hard Limit)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Lock Screen Face ID Assistant")
+                            .font(.system(size: 12, weight: .semibold))
+
+                        Spacer()
+
+                        Text("Max 5.0s Camera Burst")
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.15))
+                            .foregroundColor(.blue)
+                            .cornerRadius(4)
+                    }
+
+                    Toggle("Enable Face ID Recognition on Lock Wake", isOn: $faceService.isFaceAssistEnabled)
+                        .toggleStyle(.checkbox)
+
+                    Text("Runs strictly upon screen lock wake using on-device Apple Vision. Zero cloud, zero video files stored. Camera forcibly killed at 5s or upon instant match.")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 10) {
+                        Button(faceService.hasEnrolledFace ? "Re-Enroll Face Profile" : "Enroll Face Profile") {
+                            faceService.enrollCurrentFace()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+
+                        if faceService.hasEnrolledFace {
+                            Button("Clear Profile") {
+                                faceService.clearEnrolledFace()
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+
+                            Text("Status: Enrolled (Local Key)")
+                                .font(.system(size: 10))
+                                .foregroundColor(.green)
+                        }
+                    }
                 }
 
                 Divider()
@@ -83,15 +156,16 @@ public struct SettingsView: View {
                     Text("Active Modules & Capabilities")
                         .font(.system(size: 12, weight: .semibold))
 
-                    Toggle("Native iOS HUD Popups (Volume & Brightness Key Overlays)", isOn: $coordinator.enableHUDOverlay)
+                    Toggle("Native iOS HUD Popups (Volume & Brightness Overlays)", isOn: $coordinator.enableHUDOverlay)
                     Toggle("Now Playing Media (Music & Spotify + Volume Slider)", isOn: $coordinator.enableMediaModule)
+                    Toggle("Live Weather (Open-Meteo Keyless Service)", isOn: $coordinator.enableWeatherModule)
                     Toggle("Calendar & Next Meeting Countdown", isOn: $coordinator.enableCalendarModule)
                     Toggle("Clipboard History Manager & Search", isOn: $coordinator.enableClipboardModule)
                     Toggle("Quick App & Web Bookmarks Launcher", isOn: $coordinator.enableLauncherModule)
                     Toggle("Focus Objective & Daily Task Ticker", isOn: $coordinator.enableFocusModule)
                     Toggle("Productivity Timers & Pomodoro Rings", isOn: $coordinator.enableTimerModule)
                     Toggle("System Telemetry (CPU, Memory, Battery, Brightness)", isOn: $coordinator.enableSystemModule)
-                    Toggle("Temporary File Shelf & AirDrop Stash", isOn: $coordinator.enableShelfModule)
+                    Toggle("Temporary File Shelf & SIPS Image Converter", isOn: $coordinator.enableShelfModule)
                     Toggle("Quick Camera Mirror & On-Device Vision Check", isOn: $coordinator.enableMirrorModule)
                     Toggle("Microphone Privacy Indicator (CoreAudio HAL)", isOn: $coordinator.enableMicIndicator)
                 }
@@ -128,6 +202,7 @@ public struct SettingsView: View {
                         coordinator.enableShelfModule = true
                         coordinator.enableMirrorModule = true
                         coordinator.enableMicIndicator = true
+                        coordinator.enableWeatherModule = true
                     }
 
                     Spacer()
@@ -140,6 +215,6 @@ public struct SettingsView: View {
             }
             .padding(22)
         }
-        .frame(width: 460, height: 530)
+        .frame(width: 480, height: 600)
     }
 }

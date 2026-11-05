@@ -7,12 +7,13 @@ public struct ExpandedCardView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Adaptive Header Tab Strip (9 Feature Tabs)
+            // Adaptive Header Tab Strip (10 Feature Tabs)
             HStack(spacing: 4) {
                 tabButton(.media, title: "Media", icon: "music.note")
                 tabButton(.calendar, title: "Calendar", icon: "calendar")
                 tabButton(.timers, title: "Timer", icon: "timer")
                 tabButton(.focus, title: "Focus", icon: "checklist")
+                tabButton(.weather, title: "Weather", icon: "cloud.sun.fill")
                 tabButton(.clipboard, title: "Clips", icon: "doc.on.clipboard.fill", badgeCount: coordinator.clipboardService.items.count)
                 tabButton(.launcher, title: "Apps", icon: "square.grid.2x2.fill")
                 tabButton(.system, title: "System", icon: "gauge.medium")
@@ -61,6 +62,8 @@ public struct ExpandedCardView: View {
             TimerExpandedView(timerService: coordinator.timerService)
         case .focus:
             FocusNoteExpandedView(focusService: coordinator.focusService)
+        case .weather:
+            WeatherExpandedView(weatherService: coordinator.weatherService)
         case .clipboard:
             ClipboardExpandedView(clipboardService: coordinator.clipboardService)
         case .launcher:

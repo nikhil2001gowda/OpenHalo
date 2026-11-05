@@ -13,5 +13,9 @@ public enum SoundEffectManager {
     public static func playDropStash() {
         NSSound(named: "Pop")?.play()
     }
+
+    public static func playActionBeep() {
+        NSSound(named: "Tink")?.play()
+    }
 }
 

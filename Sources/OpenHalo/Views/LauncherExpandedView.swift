@@ -72,3 +72,4 @@ public struct LauncherExpandedView: View {
         .padding(.vertical, 8)
     }
 }
+

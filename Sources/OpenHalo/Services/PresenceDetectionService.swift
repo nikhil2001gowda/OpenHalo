@@ -130,3 +130,4 @@ public final class PresenceDetectionService: NSObject, ObservableObject, AVCaptu
         }
     }
 }
+

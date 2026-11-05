@@ -52,3 +52,4 @@ public struct ClipboardItem: Identifiable, Equatable, Sendable {
         }
     }
 }
+

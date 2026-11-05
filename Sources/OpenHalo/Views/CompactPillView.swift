@@ -30,6 +30,8 @@ public struct CompactPillView: View {
             nextEventLeading
         case .focusTask:
             focusLeading
+        case .weather:
+            weatherLeading
         case .timer:
             timerLeading
         case .clock:
@@ -55,6 +57,8 @@ public struct CompactPillView: View {
                 AudioWaveformBarView(isPlaying: coordinator.mediaService.currentTrack.isPlaying, color: .green)
             case .battery:
                 batteryTrailing
+            case .weather:
+                weatherTrailing
             case .micIndicator:
                 EmptyView()
             case .volume:
@@ -204,6 +208,28 @@ public struct CompactPillView: View {
                 .foregroundColor(.white.opacity(0.85))
                 .lineLimit(1)
                 .frame(maxWidth: 65, alignment: .trailing)
+        }
+    }
+
+    private var weatherLeading: some View {
+        HStack(spacing: 5) {
+            Image(systemName: coordinator.weatherService.current?.sfSymbol ?? "sun.max.fill")
+                .font(.system(size: 11))
+                .foregroundColor(.yellow)
+            Text(coordinator.weatherService.current?.formattedTemp ?? "--°")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.white)
+        }
+    }
+
+    private var weatherTrailing: some View {
+        HStack(spacing: 4) {
+            Image(systemName: coordinator.weatherService.current?.sfSymbol ?? "cloud.sun.fill")
+                .font(.system(size: 10))
+                .foregroundColor(.yellow)
+            Text(coordinator.weatherService.current?.formattedTemp ?? "--°")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.white)
         }
     }
 }

@@ -43,6 +43,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let focusItem = NSMenuItem(title: "Focus Task & Notes", action: #selector(showFocusTab), keyEquivalent: "4")
         menu.addItem(focusItem)
 
+        let weatherItem = NSMenuItem(title: "Live Weather Forecast", action: #selector(showWeatherTab), keyEquivalent: "w")
+        menu.addItem(weatherItem)
+
         let clipboardItem = NSMenuItem(title: "Clipboard History Manager", action: #selector(showClipboardTab), keyEquivalent: "5")
         menu.addItem(clipboardItem)
 
@@ -98,6 +101,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showFocusTab() {
         Task { @MainActor in
             IslandCoordinator.shared.expandTo(tab: .focus)
+        }
+    }
+
+    @objc private func showWeatherTab() {
+        Task { @MainActor in
+            IslandCoordinator.shared.expandTo(tab: .weather)
         }
     }
 

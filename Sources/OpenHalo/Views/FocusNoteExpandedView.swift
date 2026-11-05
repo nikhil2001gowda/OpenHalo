@@ -104,3 +104,4 @@ public struct FocusNoteExpandedView: View {
         .padding(.vertical, 8)
     }
 }
+

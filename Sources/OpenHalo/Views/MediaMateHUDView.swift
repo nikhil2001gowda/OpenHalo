@@ -76,3 +76,4 @@ public struct MediaMateHUDView: View {
         }
     }
 }
+
