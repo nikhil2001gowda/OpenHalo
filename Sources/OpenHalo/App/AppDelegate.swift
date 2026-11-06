@@ -21,6 +21,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup global keyboard shortcuts
         setupKeyboardShortcuts()
+
+        // Check first-run permissions
+        checkFirstLaunchPermissions()
+    }
+
+    private func checkFirstLaunchPermissions() {
+        let hasLaunchedBefore = UserDefaults.standard.bool(forKey: "OpenHalo.HasLaunchedBefore")
+        if !hasLaunchedBefore {
+            UserDefaults.standard.set(true, forKey: "OpenHalo.HasLaunchedBefore")
+            // Proactively request Accessibility on first launch so lock-screen features are pre-approved
+            if !KeystrokeInjector.isAccessibilityTrusted() {
+                KeystrokeInjector.promptForAccessibility()
+            }
+        }
     }
 
     private var globalKeyMonitor: Any?

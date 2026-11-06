@@ -177,15 +177,28 @@ enum SecureCredentialManager {
     /// No separate Touch ID prompt — only the session key was gated, at unlock time. Caller MUST zero the returned bytes via
     /// `.resetBytes(in:)` after use. Blocking; call from a background task.
     nonisolated static func readPassword() throws -> Data {
+        // 1. Direct memory cache from KeychainHelper (instant zero-prompt)
+        if let cached = KeychainHelper.getMemoryCachedPassword(), let data = cached.data(using: .utf8) {
+            recordActivity()
+            return data
+        }
+
+        // 2. Encrypted blob session key
         if cachedKey() != nil, let ciphertext = try? KeychainManager.read(account: passwordBlobAccount),
            let plaintext = try? decrypt(ciphertext) {
             recordActivity()
+            if let str = String(data: plaintext, encoding: .utf8) {
+                KeychainHelper.setMemoryCachedPassword(str)
+            }
             return plaintext
         }
+
+        // 3. Fallback to KeychainHelper getPassword
         if let fallback = KeychainHelper.getPassword(), let data = fallback.data(using: .utf8) {
             recordActivity()
             return data
         }
+
         guard cachedKey() != nil else { throw SecureCredentialError.sessionLocked }
         let ciphertext = try KeychainManager.read(account: passwordBlobAccount)
         let plaintext = try decrypt(ciphertext)

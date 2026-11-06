@@ -30,6 +30,12 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
     @Published public var lastRecognitionTimestamp: Date? = nil
     @Published public var statusMessage: String = "Idle"
 
+    // Mandatory Permission & Keychain Authorization Gates
+    @Published public var isVerifyingPermissions: Bool = false
+    @Published public var permissionErrorMessage: String? = nil
+    @Published public var isShowingPermissionAlert: Bool = false
+    @Published public var isKeychainAuthorized: Bool = (KeychainHelper.getMemoryCachedPassword() != nil)
+
     // Interactive 9-Pose Enrollment Properties (Glance Engine)
     @Published public var isEnrolling: Bool = false
     @Published public var enrollmentProgress: Double = 0.0
@@ -61,8 +67,30 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
 
     public override init() {
         super.init()
-        self.isFaceAssistEnabled = UserDefaults.standard.bool(forKey: "OpenHalo.FaceID.Enabled")
         loadEnrolledFace()
+
+        let wasEnabled = UserDefaults.standard.bool(forKey: "OpenHalo.FaceID.Enabled")
+        if wasEnabled {
+            let trusted = KeystrokeInjector.isAccessibilityTrusted()
+            let hasFace = hasEnrolledFace || !FaceEnrollmentStore.shared.activeIdentities.isEmpty
+            let hasPass = KeychainHelper.hasPassword() || SecureCredentialManager.hasStoredPassword()
+            if !trusted || !hasFace || !hasPass {
+                // Disarm automatically if prerequisites are missing
+                self.isFaceAssistEnabled = false
+                UserDefaults.standard.set(false, forKey: "OpenHalo.FaceID.Enabled")
+                self.statusMessage = "Face ID paused: missing permissions"
+            } else {
+                self.isFaceAssistEnabled = true
+                Task {
+                    if let pw = await KeychainHelper.getPasswordAsync(timeoutSeconds: 5.0) {
+                        KeychainHelper.setMemoryCachedPassword(pw)
+                        await MainActor.run {
+                            self.isKeychainAuthorized = true
+                        }
+                    }
+                }
+            }
+        }
 
         NotificationCenter.default.addObserver(
             forName: NSApplication.didBecomeActiveNotification,
@@ -83,6 +111,60 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
         if self.isAccessibilityGranted != trusted {
             self.isAccessibilityGranted = trusted
         }
+    }
+
+    // MARK: - Mandatory Pre-Flight Authorization Gate
+
+    public func requestEnableFaceAssist() async {
+        isVerifyingPermissions = true
+        defer { isVerifyingPermissions = false }
+
+        // Gate 1: Accessibility
+        checkAccessibilityPermission()
+        guard isAccessibilityGranted else {
+            permissionErrorMessage = "Accessibility Permission Required\n\nOpenHalo requires Accessibility trust to inject login keystrokes at the lock screen.\n\nPlease enable OpenHalo under System Settings → Privacy & Security → Accessibility, then toggle Face ID on again."
+            isShowingPermissionAlert = true
+            isFaceAssistEnabled = false
+            openAccessibilitySettings()
+            return
+        }
+
+        // Gate 2: Face Enrollment
+        guard hasEnrolledFace || !FaceEnrollmentStore.shared.activeIdentities.isEmpty else {
+            permissionErrorMessage = "Face Profile Required\n\nPlease enroll your face first using Guided Notch Sweep or Modal Enrollment before enabling Face ID."
+            isShowingPermissionAlert = true
+            isFaceAssistEnabled = false
+            return
+        }
+
+        // Gate 3: Password Stored
+        guard KeychainHelper.hasPassword() || SecureCredentialManager.hasStoredPassword() else {
+            permissionErrorMessage = "Login Password Required\n\nPlease enter and save your macOS login password below so OpenHalo can securely unlock your Mac."
+            isShowingPermissionAlert = true
+            isFaceAssistEnabled = false
+            return
+        }
+
+        // Gate 4: Pre-Flight Keychain Read Authorization
+        statusMessage = "Verifying Keychain Authorization..."
+        if let password = await KeychainHelper.getPasswordAsync(timeoutSeconds: 15.0), !password.isEmpty {
+            KeychainHelper.setMemoryCachedPassword(password)
+            self.isKeychainAuthorized = true
+            self.isFaceAssistEnabled = true
+            self.statusMessage = "Face ID Enabled & Pre-Authorized ✓"
+            self.permissionErrorMessage = nil
+        } else {
+            self.isKeychainAuthorized = false
+            self.isFaceAssistEnabled = false
+            self.permissionErrorMessage = "Keychain Authorization Denied\n\nOpenHalo was not granted access to the stored password in your Keychain.\n\nPlease click 'Always Allow' when prompted by macOS Keychain to authorize Face ID auto-unlock."
+            self.isShowingPermissionAlert = true
+            self.statusMessage = "Keychain authorization denied"
+        }
+    }
+
+    public func disableFaceAssist() {
+        self.isFaceAssistEnabled = false
+        self.statusMessage = "Face ID Disabled"
     }
 
     public func openAccessibilitySettings() {

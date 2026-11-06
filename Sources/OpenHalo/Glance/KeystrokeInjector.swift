@@ -47,6 +47,8 @@ enum KeystrokeInjector {
             throw KeystrokeError.eventCreationFailed
         }
         let source = CGEventSource(stateID: .hidSystemState)
+        // Ensure the lock screen secure field has settled and receives HID events
+        Thread.sleep(forTimeInterval: 0.05)
         try clearFocusedField(source: source)
         try postUnicodeText(text, source: source)
         try postReturn(source: source)

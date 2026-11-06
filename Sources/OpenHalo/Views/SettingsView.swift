@@ -110,12 +110,76 @@ public struct SettingsView: View {
                     .cornerRadius(4)
             }
 
-            Toggle("Enable Face ID Recognition on Lock Wake", isOn: $faceService.isFaceAssistEnabled)
+            HStack {
+                Toggle("Enable Face ID Recognition on Lock Wake", isOn: Binding(
+                    get: { faceService.isFaceAssistEnabled },
+                    set: { enable in
+                        if enable {
+                            Task {
+                                await faceService.requestEnableFaceAssist()
+                            }
+                        } else {
+                            faceService.disableFaceAssist()
+                        }
+                    }
+                ))
                 .toggleStyle(.checkbox)
+                .disabled(faceService.isVerifyingPermissions)
+
+                if faceService.isVerifyingPermissions {
+                    ProgressView()
+                        .controlSize(.mini)
+                    Text("Pre-authorizing...")
+                        .font(.system(size: 10))
+                        .foregroundColor(.cyan)
+                }
+            }
 
             Text("Authentic Glance Face Recognition: Multi-angle 9-pose embedding, Core Image low-light adaptive contrast for dark/night rooms, and far/near distance support.")
                 .font(.system(size: 10))
                 .foregroundColor(.secondary)
+
+            // Mandatory Prerequisites Checklist
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Mandatory Requirements for Lock-Screen Auto-Unlock:")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(Color.white.opacity(0.8))
+
+                HStack(spacing: 12) {
+                    // 1. Accessibility
+                    HStack(spacing: 4) {
+                        Image(systemName: faceService.isAccessibilityGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(faceService.isAccessibilityGranted ? .green : .orange)
+                        Text("1. Device Control (Accessibility)")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(faceService.isAccessibilityGranted ? .white : Color.white.opacity(0.6))
+                    }
+
+                    // 2. Face Enrolled
+                    HStack(spacing: 4) {
+                        Image(systemName: faceService.hasEnrolledFace ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(faceService.hasEnrolledFace ? .green : .orange)
+                        Text("2. Face Profile (9 Poses)")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(faceService.hasEnrolledFace ? .white : Color.white.opacity(0.6))
+                    }
+
+                    // 3. Password
+                    HStack(spacing: 4) {
+                        Image(systemName: hasStoredPassword ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(hasStoredPassword ? .green : .orange)
+                        Text("3. Login Password")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(hasStoredPassword ? .white : Color.white.opacity(0.6))
+                    }
+                }
+            }
+            .padding(8)
+            .background(Color.white.opacity(0.04))
+            .cornerRadius(6)
 
             HStack(spacing: 10) {
                 Button(action: {
@@ -154,6 +218,16 @@ public struct SettingsView: View {
             // Advanced Glance Settings Disclosure
             glanceAdvancedSettingsDisclosure
         }
+        .alert("Face ID Permission Required", isPresented: $faceService.isShowingPermissionAlert) {
+            Button("OK", role: .cancel) {}
+            if !faceService.isAccessibilityGranted {
+                Button("Open Settings") {
+                    faceService.openAccessibilitySettings()
+                }
+            }
+        } message: {
+            Text(faceService.permissionErrorMessage ?? "Please ensure all mandatory permissions are granted before enabling Face ID.")
+        }
         .sheet(isPresented: $isShowingEnrollmentSheet) {
             FaceIDEnrollmentView(faceService: faceService) {
                 isShowingEnrollmentSheet = false
@@ -167,20 +241,25 @@ public struct SettingsView: View {
                 .font(.system(size: 11, weight: .medium))
 
             HStack(spacing: 8) {
-                SecureField(hasStoredPassword ? "•••••••••••• (Saved)" : "Enter macOS User Password", text: $macPassword)
+                SecureField(hasStoredPassword ? "•••••••••••• (Saved & Pre-Authorized)" : "Enter macOS User Password", text: $macPassword)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 240)
 
                 Button("Save to Keychain") {
                     if !macPassword.isEmpty {
-                        if KeychainHelper.savePassword(macPassword) {
+                        let entered = macPassword
+                        macPassword = ""
+                        if KeychainHelper.savePassword(entered) {
                             hasStoredPassword = true
-                            passwordStatusMessage = "Encrypted in macOS Keychain"
-                            macPassword = ""
+                            passwordStatusMessage = "Encrypted in macOS Keychain & Cached"
+                            // Immediately pre-authorize in foreground so macOS prompts now rather than at lock screen
+                            Task {
+                                _ = await KeychainHelper.getPasswordAsync(timeoutSeconds: 15.0)
+                            }
                         }
                     }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
                 .controlSize(.small)
                 .disabled(macPassword.isEmpty)
 
@@ -189,6 +268,7 @@ public struct SettingsView: View {
                         KeychainHelper.deletePassword()
                         hasStoredPassword = false
                         passwordStatusMessage = "Removed"
+                        faceService.isFaceAssistEnabled = false
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -200,9 +280,9 @@ public struct SettingsView: View {
                     .fill(hasStoredPassword ? Color.green : Color.orange)
                     .frame(width: 6, height: 6)
 
-                Text(hasStoredPassword ? "Keychain: Encrypted & Ready for Auto-Unlock" : "Optional: Save password to enable instant keystroke unlock on wake")
+                Text(hasStoredPassword ? "Keychain: Encrypted & Ready for Auto-Unlock" : "Mandatory: Save password to allow Face ID to unlock at lock screen")
                     .font(.system(size: 10))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(hasStoredPassword ? .secondary : .orange)
 
                 if let msg = passwordStatusMessage {
                     Text("• \(msg)")
@@ -217,7 +297,7 @@ public struct SettingsView: View {
                     .fill(faceService.isAccessibilityGranted ? Color.green : Color.orange)
                     .frame(width: 6, height: 6)
 
-                Text(faceService.isAccessibilityGranted ? "Device Control & Keystrokes: Granted ✓" : "Device Control & Data Access: Required")
+                Text(faceService.isAccessibilityGranted ? "Device Control & Keystrokes: Granted ✓" : "Device Control & Data Access: Required for Lock Screen")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(faceService.isAccessibilityGranted ? .green : .orange)
 

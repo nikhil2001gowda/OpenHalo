@@ -101,7 +101,18 @@ final class POCController {
         }
 
         if requireAuthoritativeLock {
-            guard LockMonitor.isScreenActuallyLocked() else {
+            var isLocked = LockMonitor.isScreenActuallyLocked()
+            if !isLocked {
+                // Settle delay: CGSession lock state can take up to 300ms to report locked after wake
+                for _ in 0..<5 {
+                    try? await Task.sleep(nanoseconds: 60_000_000)
+                    if LockMonitor.isScreenActuallyLocked() {
+                        isLocked = true
+                        break
+                    }
+                }
+            }
+            guard isLocked else {
                 statusMessage = "Skipped: CGSession reports screen is not actually locked."
                 return
             }
