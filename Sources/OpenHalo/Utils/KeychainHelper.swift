@@ -38,8 +38,15 @@ public enum KeychainHelper {
     }
 
     public static func hasPassword() -> Bool {
-        guard let pass = getPassword() else { return false }
-        return !pass.isEmpty
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: serviceName,
+            kSecAttrAccount as String: accountName,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        return status != errSecItemNotFound
     }
 
     public static func deletePassword() {

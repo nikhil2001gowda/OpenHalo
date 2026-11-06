@@ -42,12 +42,9 @@ public struct CompactPillView: View {
     @ViewBuilder
     private var trailingContent: some View {
         HStack(spacing: 7) {
-            // Always preserve microphone privacy dot if active for security
+            // Always preserve microphone privacy dot if active for security (Atoll Glowing Recording Indicator)
             if coordinator.enableMicIndicator && coordinator.audioMonitor.isMicrophoneActive {
-                Circle()
-                    .fill(Color.orange)
-                    .frame(width: 7, height: 7)
-                    .shadow(color: .orange.opacity(0.8), radius: 3)
+                AtollRecordingIndicator(isActive: true, color: .orange, indicatorSize: 6.5)
             }
 
             switch coordinator.trailingSlot {

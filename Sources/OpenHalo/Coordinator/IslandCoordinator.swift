@@ -272,7 +272,7 @@ public final class IslandCoordinator: ObservableObject {
 
         self.activeTab = tab
 
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+        withAnimation(AtollAnimations.notchSpring) {
             self.state = .expanded(tab)
         }
 
@@ -297,7 +297,7 @@ public final class IslandCoordinator: ObservableObject {
         presenceService.stopAndCleanup()
         setKeyboardFocus(false)
 
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+        withAnimation(AtollAnimations.pillSpring) {
             self.state = .compact
         }
     }

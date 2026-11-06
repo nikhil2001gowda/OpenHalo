@@ -198,31 +198,15 @@ public struct SystemHealthView: View {
         icon: String,
         color: Color
     ) -> some View {
-        VStack(spacing: 5) {
-            ZStack {
-                CircularProgressRing(
-                    progress: progress,
-                    lineWidth: 3.5,
-                    primaryColor: color,
-                    secondaryColor: Color.white.opacity(0.12)
-                )
-                .frame(width: 34, height: 34)
-
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(color)
-            }
-
-            Text(value)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-
-            Text(title)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.5))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
+        AtollCircularGaugeView(
+            title: title,
+            value: progress,
+            tint: color,
+            centerIcon: icon,
+            centerPrimaryText: value,
+            size: 40,
+            lineWidth: 3.5
+        )
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.white.opacity(0.06))

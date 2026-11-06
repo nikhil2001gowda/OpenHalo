@@ -37,10 +37,19 @@ public struct MediaExpandedView: View {
 
                 // Title & Artist
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(isTrackActive ? mediaService.currentTrack.title : "No Media Playing")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+                    if isTrackActive {
+                        AtollMarqueeText(
+                            mediaService.currentTrack.title,
+                            font: .system(size: 13, weight: .semibold),
+                            textColor: .white,
+                            frameWidth: 190
+                        )
+                    } else {
+                        Text("No Media Playing")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                    }
 
                     if !isTrackActive {
                         Text("Auto-detects any media app when playing")
@@ -184,21 +193,16 @@ public struct MediaExpandedView: View {
 
                 Spacer()
 
-                // System Volume Slider
-                HStack(spacing: 6) {
-                    Image(systemName: systemControls.volume == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Color.white.opacity(0.7))
-
-                    Slider(
-                        value: Binding(
-                            get: { systemControls.volume },
-                            set: { systemControls.setVolume($0) }
-                        ),
-                        in: 0...1
-                    )
-                    .frame(width: 90)
-                }
+                // Atoll Tactile Volume Capsule Slider
+                AtollVolumeCapsuleSlider(
+                    value: Binding(
+                        get: { Double(systemControls.volume) },
+                        set: { systemControls.setVolume(Float($0)) }
+                    ),
+                    tint: .white,
+                    compact: true
+                )
+                .frame(width: 130)
             }
             .padding(.top, 2)
         }
