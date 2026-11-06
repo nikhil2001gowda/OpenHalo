@@ -34,7 +34,8 @@ enum KeychainError: LocalizedError {
 }
 
 enum KeychainManager {
-    nonisolated static let service = "com.nikhil2001gowda.openhalo"
+    nonisolated static let service = "com.mewlabs.openhalo"
+    nonisolated private static let legacyService = "com.nikhil2001gowda.openhalo"
 
     private static func createSelfTrustedAccess(description: String) -> SecAccess? {
         var trustedApp: SecTrustedApplication?
@@ -56,7 +57,18 @@ enum KeychainManager {
         ]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        return status != errSecItemNotFound
+        if status != errSecItemNotFound { return true }
+
+        // Fallback check on prior openhalo service (zero UI prompt)
+        let priorQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: legacyService,
+            kSecAttrAccount as String: account,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail
+        ]
+        var priorItem: CFTypeRef?
+        return SecItemCopyMatching(priorQuery as CFDictionary, &priorItem) != errSecItemNotFound
     }
 
     /// Pass an `LAContext` to authorize a read on an access-controlled item — the OS presents the prompt during this call.
@@ -73,6 +85,27 @@ enum KeychainManager {
         }
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
+
+        // Silent seamless migration: if not in com.mewlabs.openhalo, copy from com.nikhil2001gowda.openhalo
+        if status == errSecItemNotFound {
+            var priorQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: legacyService,
+                kSecAttrAccount as String: account,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+                kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail
+            ]
+            if let context {
+                priorQuery[kSecUseAuthenticationContext as String] = context
+            }
+            var priorItem: CFTypeRef?
+            let priorStatus = SecItemCopyMatching(priorQuery as CFDictionary, &priorItem)
+            if priorStatus == errSecSuccess, let priorData = priorItem as? Data {
+                try? save(account: account, data: priorData)
+                return priorData
+            }
+        }
 
         switch status {
         case errSecSuccess:

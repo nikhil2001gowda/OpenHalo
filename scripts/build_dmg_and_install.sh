@@ -42,7 +42,7 @@ cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.openhalo.app</string>
+    <string>com.mewlabs.openhalo</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -77,7 +77,7 @@ cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
 EOF
 
 echo "🔏 Signing ${APP_NAME} with stable designated requirement..."
-codesign --force --deep -s - --requirements '=designated => identifier "com.openhalo.app"' "${APP_BUNDLE}" 2>/dev/null || true
+codesign --force --deep -s - --requirements '=designated => identifier "com.mewlabs.openhalo"' "${APP_BUNDLE}" 2>/dev/null || true
 
 # 1. Install directly to /Applications (or ~/Applications)
 TARGET_APP="/Applications/${APP_NAME}"
@@ -93,7 +93,7 @@ sleep 0.5
 
 rm -rf "${TARGET_APP}"
 cp -R "${APP_BUNDLE}" "${TARGET_APP}"
-codesign --force --deep -s - --requirements '=designated => identifier "com.openhalo.app"' "${TARGET_APP}" 2>/dev/null || true
+codesign --force --deep -s - --requirements '=designated => identifier "com.mewlabs.openhalo"' "${TARGET_APP}" 2>/dev/null || true
 
 # 2. Generate OpenHalo.dmg
 echo "💿 Creating standalone OpenHalo.dmg..."
