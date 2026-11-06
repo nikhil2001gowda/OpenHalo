@@ -270,6 +270,21 @@ struct NotchOverlayView: View {
         .frame(width: currentSize.width, height: currentSize.height)
         .background(Color.black)
         .clipShape(NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, style: style))
+        .overlay(
+            NotchShape(topRadius: topRadius, bottomRadius: bottomRadius, style: style)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(visualIsExpanded ? 0.20 : 0.0),
+                            Color.white.opacity(visualIsExpanded ? 0.06 : 0.0),
+                            Color.white.opacity(visualIsExpanded ? 0.14 : 0.0)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.8
+                )
+        )
         // Reports this panel's own current frame, relative to the fixed
         // window's full bounds (`Self.interactiveCoordinateSpace`, declared
         // below on the outermost frame) — restricts the window's click

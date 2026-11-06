@@ -89,23 +89,22 @@ struct NotchGeometry {
     // `UnlockAnimationStyle.minimal`: the silhouette widens only, revealing a lock
     // icon on one side and the unlock video on the other. See MinimalUnlockView.
 
-    /// Total notch body width is `geometry.closedSize.width + 2 * this`. Window is
-    /// ~434pt wide (see `windowSize(for:)`), so much past 100 will start to clip.
-    static let minimalNotchFlankWidth: CGFloat = 42
+    /// Total notch body width is `geometry.closedSize.width + 2 * this`.
+    static let minimalNotchFlankWidth: CGFloat = 58
 
     /// Taller than `pillClosedSize.height` for legibility; radius stays `height / 2`
     /// so it remains a true capsule while stretching.
-    static let minimalPillOpenWidth: CGFloat = 150
-    static let minimalPillOpenHeight: CGFloat = 40
+    static let minimalPillOpenWidth: CGFloat = 160
+    static let minimalPillOpenHeight: CGFloat = 42
 
     /// Extra height added only in notch style — the physical notch's height can't
     /// change, so this appears as real, visible black below it.
-    static let minimalNotchHeightBump: CGFloat = 12
+    static let minimalNotchHeightBump: CGFloat = 16
 
     /// More rounded than the resting silhouette's radii (8/12), same ratio the
     /// full-expand style uses (16/60).
-    static let minimalNotchTopRadius: CGFloat = 12
-    static let minimalNotchBottomRadius: CGFloat = 22
+    static let minimalNotchTopRadius: CGFloat = 14
+    static let minimalNotchBottomRadius: CGFloat = 24
 
     /// In notch style the flare already occupies `topRadius` of this margin.
     static let minimalContentEdgeInset: CGFloat = 4
@@ -116,12 +115,12 @@ struct NotchGeometry {
     /// `min(this, panelHeight - 2 * minimalMediaVerticalInset)`.
     static let minimalMediaWidth: CGFloat = 34
     /// Without this the square aspect-fits to the full panel height and touches both edges.
-    static let minimalMediaVerticalInset: CGFloat = 8
+    static let minimalMediaVerticalInset: CGFloat = 6
 
     /// Notch-style counterparts of the three above, bumped up to match `minimalNotchHeightBump`.
     static let minimalNotchLockIconSize: CGFloat = 16
     static let minimalNotchMediaWidth: CGFloat = 40
-    static let minimalNotchMediaVerticalInset: CGFloat = 11
+    static let minimalNotchMediaVerticalInset: CGFloat = 8
 
     /// So the lock glyph can be nudged to land with the video's own resolve beat.
     static let minimalLockUnlockDelay: Double = 0

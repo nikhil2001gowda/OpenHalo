@@ -588,7 +588,23 @@ public struct SettingsView: View {
                 }
 
                 // Test Animation & Recommended Reset Buttons
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
+                    Button(action: {
+                        let style = glanceSettings.effectiveUnlockAnimationStyle
+                        NotchOverlayController.shared.present(styleOverride: style)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                            SoundEffectManager.playActionBeep()
+                            NotchOverlayController.shared.finish(success: true)
+                        }
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "sparkles")
+                            Text("Test Notch (\(glanceSettings.unlockAnimationStyle.rawValue.capitalized))")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+
                     Button(action: {
                         coordinator.showFaceIDScan(isScanning: true, isUnlocked: false)
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
@@ -596,9 +612,9 @@ public struct SettingsView: View {
                             coordinator.showFaceIDScan(isScanning: false, isUnlocked: true)
                         }
                     }) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Image(systemName: "faceid")
-                            Text("Test Face ID HUD")
+                            Text("Test Island HUD")
                         }
                     }
                     .buttonStyle(.bordered)
@@ -607,9 +623,9 @@ public struct SettingsView: View {
                     Button(action: {
                         glanceSettings.resetToRecommendedDefaults()
                     }) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 5) {
                             Image(systemName: "arrow.counterclockwise")
-                            Text("Reset Recommended (68% / 10% Width)")
+                            Text("Reset Defaults")
                         }
                     }
                     .buttonStyle(.bordered)

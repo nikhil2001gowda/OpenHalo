@@ -25,7 +25,7 @@ struct MinimalUnlockView: View {
         HStack(spacing: 0) {
             Image(systemName: isUnlocked ? "lock.open.fill" : "lock.fill")
                 .font(.system(size: lockIconSize, weight: .semibold))
-                .foregroundStyle(GlanceTheme.textPrimary)
+                .foregroundStyle(isUnlocked ? Color.green : GlanceTheme.textPrimary)
                 // The explicit `.animation` below is required: the phase change that flips
                 // `isUnlocked` isn't itself wrapped in an animation transaction.
                 .contentTransition(.opacity)
@@ -33,18 +33,18 @@ struct MinimalUnlockView: View {
                     .smooth(duration: NotchGeometry.minimalLockAnimationDuration),
                     value: isUnlocked
                 )
-                .frame(width: mediaWidth)
+                .frame(width: mediaWidth, height: mediaWidth)
 
             Spacer(minLength: 0)
 
             ScanAnimationView(media: media)
                 .padding(.vertical, mediaVerticalInset)
-                .frame(width: mediaWidth)
+                .frame(width: mediaWidth, height: mediaWidth)
                 // Scoped to the video alone — the lock icon on the left
                 // must stay steady while this breathes.
                 .scaleEffect(pulseScale)
                 .opacity(pulseOpacity)
-                .padding(.trailing, 4)
+                .padding(.trailing, 2)
         }
         .padding(.horizontal, edgeInset)
     }
