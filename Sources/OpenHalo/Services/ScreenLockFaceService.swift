@@ -29,14 +29,35 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
     @Published public var statusMessage: String = "Idle"
 
     public func checkAccessibilityPermission() {
-        self.isAccessibilityGranted = KeystrokeInjector.isAccessibilityTrusted()
+        let trusted = KeystrokeInjector.isAccessibilityTrusted()
+        if self.isAccessibilityGranted != trusted {
+            self.isAccessibilityGranted = trusted
+        }
     }
 
-    public func requestAccessibilityPermission() {
+    public func openAccessibilitySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
         KeystrokeInjector.promptForAccessibility()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             self?.checkAccessibilityPermission()
         }
+    }
+
+    public func relaunchApp() {
+        let bundleURL = Bundle.main.bundleURL
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: bundleURL, configuration: config) { _, _ in
+            DispatchQueue.main.async {
+                NSApplication.shared.terminate(nil)
+            }
+        }
+    }
+
+    public func requestAccessibilityPermission() {
+        openAccessibilitySettings()
     }
 
     // Interactive Enrollment Properties
@@ -64,6 +85,14 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         self.isFaceAssistEnabled = UserDefaults.standard.bool(forKey: "OpenHalo.FaceID.Enabled")
         loadEnrolledFace()
         registerScreenLockObservers()
+
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.checkAccessibilityPermission()
+        }
     }
 
     deinit {

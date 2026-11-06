@@ -165,22 +165,40 @@ public struct SettingsView: View {
                             }
                         }
 
-                        // Accessibility Permission Status (Glance Architecture)
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(faceService.isAccessibilityGranted ? Color.green : Color.orange)
-                                .frame(width: 6, height: 6)
+                        // Accessibility / Device Control Permission Status (Glance Architecture)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(faceService.isAccessibilityGranted ? Color.green : Color.orange)
+                                    .frame(width: 6, height: 6)
 
-                            Text(faceService.isAccessibilityGranted ? "Accessibility: Granted (Hardware Keystroke Injection Ready)" : "Accessibility: Required for lockscreen keystrokes")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(faceService.isAccessibilityGranted ? .secondary : .orange)
+                                Text(faceService.isAccessibilityGranted ? "Device Control & Keystrokes: Granted ✓" : "Device Control & Data Access: Required")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(faceService.isAccessibilityGranted ? .green : .orange)
+
+                                if faceService.isAccessibilityGranted {
+                                    Text("(Ready for Lock Screen)")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Button("Open Settings") {
+                                        faceService.openAccessibilitySettings()
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.mini)
+
+                                    Button("Relaunch App") {
+                                        faceService.relaunchApp()
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .controlSize(.mini)
+                                }
+                            }
 
                             if !faceService.isAccessibilityGranted {
-                                Button("Grant Access") {
-                                    faceService.requestAccessibilityPermission()
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.mini)
+                                Text("Tip: If you toggled OpenHalo ON in System Settings, click 'Relaunch App' to activate the new permission.")
+                                    .font(.system(size: 9.5))
+                                    .foregroundColor(.secondary)
                             }
                         }
 
@@ -314,5 +332,11 @@ public struct SettingsView: View {
             .padding(22)
         }
         .frame(width: 480, height: 600)
+        .onAppear {
+            faceService.checkAccessibilityPermission()
+        }
+        .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
+            faceService.checkAccessibilityPermission()
+        }
     }
 }
