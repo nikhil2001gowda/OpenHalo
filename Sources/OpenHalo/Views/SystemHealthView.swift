@@ -8,8 +8,6 @@ public struct SystemHealthView: View {
 
     @State private var copiedUUID = false
     @State private var formattedJSON = false
-    @State private var isDraggingBrightness = false
-    @State private var dragBrightnessFraction: Double = 0.5
 
     @MainActor
     public init(
@@ -59,9 +57,6 @@ public struct SystemHealthView: View {
                 )
             }
 
-            // Tactile Display Brightness Capsule Slider
-            brightnessCapsuleSlider
-
             // Devly Quick Tools Bar
             quickToolsBar
 
@@ -70,9 +65,6 @@ public struct SystemHealthView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .onAppear {
-            systemControls.syncHardwareBrightness(isUserAction: false)
-        }
     }
 
     // MARK: - Modern Sequoia Activity-Ring Metric Card
@@ -140,77 +132,6 @@ public struct SystemHealthView: View {
                         .stroke(Color.white.opacity(0.09), lineWidth: 0.5)
                 )
         )
-    }
-
-    // MARK: - Display Brightness Capsule Slider
-
-    private var currentEffectiveBrightness: Double {
-        if isDraggingBrightness {
-            return dragBrightnessFraction
-        } else {
-            return min(max(Double(systemControls.brightness), 0.0), 1.0)
-        }
-    }
-
-    private var brightnessCapsuleSlider: some View {
-        HStack(spacing: 9) {
-            Image(systemName: "sun.min.fill")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.5 + currentEffectiveBrightness * 0.4))
-
-            GeometryReader { geo in
-                let width = geo.size.width
-                let filledWidth = width > 20 ? max(14, width * CGFloat(currentEffectiveBrightness)) : 14
-
-                ZStack(alignment: .leading) {
-                    // Track
-                    Capsule(style: .continuous)
-                        .fill(Color.white.opacity(0.12))
-
-                    // Illuminated Fill
-                    Capsule(style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 1.0, green: 0.8, blue: 0.2),
-                                    Color(red: 1.0, green: 0.65, blue: 0.1)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: filledWidth)
-                        .shadow(color: Color.orange.opacity(0.3), radius: 4, x: 0, y: 0)
-                }
-                .frame(height: 12)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 1)
-                        .onChanged { gesture in
-                            guard width > 20 else { return }
-                            isDraggingBrightness = true
-                            let fraction = min(max(Double(gesture.location.x / width), 0.0), 1.0)
-                            dragBrightnessFraction = fraction
-                            systemControls.setBrightness(Float(fraction))
-                        }
-                        .onEnded { gesture in
-                            guard width > 20 else { return }
-                            let fraction = min(max(Double(gesture.location.x / width), 0.0), 1.0)
-                            dragBrightnessFraction = fraction
-                            systemControls.commitFinalBrightness(Float(fraction))
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                                isDraggingBrightness = false
-                            }
-                        }
-                )
-            }
-            .frame(height: 12)
-
-            Image(systemName: "sun.max.fill")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.yellow)
-        }
-        .padding(.horizontal, 4)
     }
 
     // MARK: - Devly Quick Tools Bar
