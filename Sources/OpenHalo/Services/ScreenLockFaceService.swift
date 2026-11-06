@@ -24,8 +24,20 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         }
     }
     @Published public var hasEnrolledFace: Bool = false
+    @Published public var isAccessibilityGranted: Bool = KeystrokeInjector.isAccessibilityTrusted()
     @Published public var lastRecognitionTimestamp: Date? = nil
     @Published public var statusMessage: String = "Idle"
+
+    public func checkAccessibilityPermission() {
+        self.isAccessibilityGranted = KeystrokeInjector.isAccessibilityTrusted()
+    }
+
+    public func requestAccessibilityPermission() {
+        KeystrokeInjector.promptForAccessibility()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            self?.checkAccessibilityPermission()
+        }
+    }
 
     // Interactive Enrollment Properties
     @Published public var isEnrolling: Bool = false
@@ -61,25 +73,17 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
     // MARK: - Screen Lock Observers
 
     private func registerScreenLockObservers() {
-        let dist = DistributedNotificationCenter.default()
-
-        dist.addObserver(
-            forName: NSNotification.Name("com.apple.screenIsLocked"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.handleScreenLocked()
-            }
-        }
-
-        dist.addObserver(
-            forName: NSNotification.Name("com.apple.screenIsUnlocked"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.handleScreenUnlocked()
+        GlanceLockMonitor.shared.onLockStateChanged = { [weak self] event in
+            guard let self = self else { return }
+            switch event {
+            case .screenLocked:
+                self.handleScreenLocked()
+            case .wake:
+                self.handleScreenWake()
+            case .screenUnlocked:
+                self.handleScreenUnlocked()
+            case .willSleep:
+                self.stopAndCleanup()
             }
         }
     }
@@ -88,8 +92,13 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         guard isFaceAssistEnabled else { return }
         self.statusMessage = "Screen Locked: Awaiting Wake"
         self.state = .waitingForLockWake
+        start5SecondFaceScan()
+    }
 
-        // Arm the burst for lock-wake
+    public func handleScreenWake() {
+        guard isFaceAssistEnabled else { return }
+        guard GlanceLockMonitor.isScreenActuallyLocked() else { return }
+        self.statusMessage = "Display Woke: Scanning Face..."
         start5SecondFaceScan()
     }
 
@@ -97,6 +106,9 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         stopAndCleanup()
         self.statusMessage = "Screen Unlocked"
         self.state = .idle
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            IslandCoordinator.shared.state = .compact
+        }
     }
 
     // MARK: - 5-Second Camera Burst Pipeline

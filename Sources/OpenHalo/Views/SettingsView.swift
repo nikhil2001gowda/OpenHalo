@@ -165,6 +165,25 @@ public struct SettingsView: View {
                             }
                         }
 
+                        // Accessibility Permission Status (Glance Architecture)
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(faceService.isAccessibilityGranted ? Color.green : Color.orange)
+                                .frame(width: 6, height: 6)
+
+                            Text(faceService.isAccessibilityGranted ? "Accessibility: Granted (Hardware Keystroke Injection Ready)" : "Accessibility: Required for lockscreen keystrokes")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(faceService.isAccessibilityGranted ? .secondary : .orange)
+
+                            if !faceService.isAccessibilityGranted {
+                                Button("Grant Access") {
+                                    faceService.requestAccessibilityPermission()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.mini)
+                            }
+                        }
+
                         // Test Face ID Notch Animation Button
                         Button(action: {
                             coordinator.showFaceIDScan(isScanning: true, isUnlocked: false)

@@ -2,6 +2,12 @@ import Foundation
 import AppKit
 
 public final class IslandPanel: NSPanel {
+    /// Above regular, menu-bar, screen-saver, and assistive overlays. The
+    /// shielding level is the highest public Core Graphics window tier.
+    public static let overlayWindowLevel = NSWindow.Level(
+        rawValue: Int(CGShieldingWindowLevel()) + 1
+    )
+
     public init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
@@ -11,7 +17,7 @@ public final class IslandPanel: NSPanel {
         )
 
         self.isFloatingPanel = true
-        self.level = .statusBar
+        self.level = Self.overlayWindowLevel
         self.collectionBehavior = [
             .canJoinAllSpaces,
             .fullScreenAuxiliary,
