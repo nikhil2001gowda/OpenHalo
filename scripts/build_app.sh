@@ -31,7 +31,7 @@ cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
     <key>CFBundleExecutable</key>
     <string>OpenHalo</string>
     <key>CFBundleIdentifier</key>
-    <string>com.mewlabs.openhalo</string>
+    <string>in.mewlabs.openhalo</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
