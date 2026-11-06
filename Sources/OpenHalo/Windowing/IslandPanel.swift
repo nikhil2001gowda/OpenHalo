@@ -1,12 +1,9 @@
 import Foundation
 import AppKit
 
-public final class IslandPanel: NSPanel {
-    /// Above regular, menu-bar, screen-saver, and assistive overlays. The
-    /// shielding level is the highest public Core Graphics window tier.
-    public static let overlayWindowLevel = NSWindow.Level(
-        rawValue: Int(CGShieldingWindowLevel()) + 1
-    )
+public final class IslandPanel: NSPanel, NSDraggingDestination {
+    /// Floating above all standard apps and the menu bar, fully accessible to the macOS Drag Manager
+    public static let overlayWindowLevel = NSWindow.Level.statusBar
 
     public init(contentRect: NSRect) {
         super.init(
@@ -41,6 +38,49 @@ public final class IslandPanel: NSPanel {
             NSPasteboard.PasteboardType("public.file-url"),
             NSPasteboard.PasteboardType("com.apple.finder.node")
         ])
+    }
+
+    // MARK: - Direct Window Drag Destination Fallback
+
+    public func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        Task { @MainActor in
+            let coordinator = IslandCoordinator.shared
+            coordinator.fileShelfService.isDropTargetActive = true
+            coordinator.isDropHovered = true
+            if !coordinator.state.isExpanded {
+                coordinator.expandTo(tab: .shelf)
+            }
+        }
+        return (contentView?.draggingEntered(sender) ?? .copy)
+    }
+
+    public func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        return (contentView?.draggingUpdated(sender) ?? .copy)
+    }
+
+    public func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        contentView?.draggingExited(sender)
+        Task { @MainActor in
+            let coordinator = IslandCoordinator.shared
+            coordinator.fileShelfService.isDropTargetActive = false
+            coordinator.isDropHovered = false
+        }
+    }
+
+    public func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        let urls = FileDropResolver.resolveURLs(from: sender.draggingPasteboard)
+        let handled = contentView?.performDragOperation(sender) ?? false
+
+        Task { @MainActor in
+            let coordinator = IslandCoordinator.shared
+            coordinator.fileShelfService.isDropTargetActive = false
+            coordinator.isDropHovered = false
+            if !urls.isEmpty {
+                coordinator.fileShelfService.addFiles(urls)
+                coordinator.expandTo(tab: .shelf)
+            }
+        }
+        return !urls.isEmpty || handled
     }
 
     public override var canBecomeKey: Bool {

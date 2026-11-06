@@ -206,10 +206,6 @@ final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        guard pasteboardHasFiles(sender.draggingPasteboard) else {
-            return super.draggingEntered(sender)
-        }
-
         Task { @MainActor in
             let coordinator = IslandCoordinator.shared
             coordinator.fileShelfService.isDropTargetActive = true
@@ -218,16 +214,13 @@ final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
                 coordinator.expandTo(tab: .shelf)
             }
         }
-        let superOp = super.draggingEntered(sender)
-        return superOp.isEmpty ? .copy : superOp
+        _ = super.draggingEntered(sender)
+        return .copy
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        guard pasteboardHasFiles(sender.draggingPasteboard) else {
-            return super.draggingUpdated(sender)
-        }
-        let superOp = super.draggingUpdated(sender)
-        return superOp.isEmpty ? .copy : superOp
+        _ = super.draggingUpdated(sender)
+        return .copy
     }
 
     override func draggingExited(_ sender: (any NSDraggingInfo)?) {
@@ -241,7 +234,7 @@ final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         let urls = FileDropResolver.resolveURLs(from: sender.draggingPasteboard)
-        let superHandled = super.performDragOperation(sender)
+        _ = super.performDragOperation(sender)
 
         Task { @MainActor in
             let coordinator = IslandCoordinator.shared
@@ -252,7 +245,7 @@ final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
                 coordinator.expandTo(tab: .shelf)
             }
         }
-        return !urls.isEmpty || superHandled
+        return true
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {

@@ -7,61 +7,79 @@ public enum FileDropResolver {
     public static func resolveURLs(from pasteboard: NSPasteboard) -> [URL] {
         var results: [URL] = []
 
-        // 1. Try reading NSURL objects directly
-        if let fileURLs = pasteboard.readObjects(forClasses: [NSURL.self], options: [
-            .urlReadingFileURLsOnly: true
-        ]) as? [URL], !fileURLs.isEmpty {
-            for url in fileURLs {
-                if FileManager.default.fileExists(atPath: url.path) && !results.contains(where: { $0.path == url.path }) {
-                    results.append(url)
+        func addURL(_ candidate: URL) {
+            let standardized = candidate.standardizedFileURL
+            let path = standardized.path
+            // Check if file exists or if it is a valid file URL
+            if FileManager.default.fileExists(atPath: path) || FileManager.default.fileExists(atPath: candidate.path) || candidate.isFileURL {
+                if !results.contains(where: { $0.path == path || $0.path == candidate.path }) {
+                    results.append(standardized)
                 }
             }
         }
 
-        // 2. Try filenames property list (classic Finder drag format)
+        func addPathString(_ str: String) {
+            let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { return }
+            if let u = URL(string: trimmed), u.isFileURL {
+                addURL(u)
+            } else if trimmed.hasPrefix("file://") {
+                if let u = URL(string: trimmed) {
+                    addURL(u)
+                }
+            } else if trimmed.hasPrefix("/") {
+                addURL(URL(fileURLWithPath: trimmed))
+            }
+        }
+
+        // 1. Read NSURL objects directly (handles both [NSURL] and [URL] bridging)
+        if let nsURLs = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [NSURL] {
+            for nsURL in nsURLs {
+                addURL(nsURL as URL)
+            }
+        }
+        if let fileURLs = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
+            for u in fileURLs {
+                addURL(u)
+            }
+        }
+
+        // 2. Read filenames from property list (classic Finder drag format)
         let filenamesType = NSPasteboard.PasteboardType("NSFilenamesPboardType")
         if let filenames = pasteboard.propertyList(forType: filenamesType) as? [String] {
             for path in filenames {
-                let url = URL(fileURLWithPath: path)
-                if FileManager.default.fileExists(atPath: url.path) && !results.contains(where: { $0.path == url.path }) {
-                    results.append(url)
-                }
+                addPathString(path)
             }
         }
 
-        // 3. Try string representations (e.g. file:///... or /...)
-        if let string = pasteboard.string(forType: .string) {
-            let lines = string.components(separatedBy: .newlines)
-            for line in lines {
-                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.isEmpty { continue }
-
-                if let url = URL(string: trimmed), url.isFileURL, FileManager.default.fileExists(atPath: url.path) {
-                    if !results.contains(where: { $0.path == url.path }) {
-                        results.append(url)
-                    }
-                } else if trimmed.hasPrefix("/") && FileManager.default.fileExists(atPath: trimmed) {
-                    let url = URL(fileURLWithPath: trimmed)
-                    if !results.contains(where: { $0.path == url.path }) {
-                        results.append(url)
-                    }
-                }
-            }
-        }
-
-        // 4. Try pasteboardItems
+        // 3. Inspect all pasteboardItems
         if let items = pasteboard.pasteboardItems {
             for item in items {
-                for type in [NSPasteboard.PasteboardType.fileURL, NSPasteboard.PasteboardType("public.file-url")] {
-                    if let str = item.string(forType: type) {
-                        let clean = str.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if let url = URL(string: clean), url.isFileURL, FileManager.default.fileExists(atPath: url.path) {
-                            if !results.contains(where: { $0.path == url.path }) {
-                                results.append(url)
-                            }
+                for type in [
+                    NSPasteboard.PasteboardType.fileURL,
+                    NSPasteboard.PasteboardType("public.file-url"),
+                    NSPasteboard.PasteboardType("com.apple.finder.node"),
+                    NSPasteboard.PasteboardType("NSFilenamesPboardType"),
+                    NSPasteboard.PasteboardType.string
+                ] {
+                    if let stringVal = item.string(forType: type) {
+                        addPathString(stringVal)
+                    }
+                    if let dataVal = item.data(forType: type) {
+                        if let u = URL(dataRepresentation: dataVal, relativeTo: nil) {
+                            addURL(u)
+                        } else if let str = String(data: dataVal, encoding: .utf8) {
+                            addPathString(str)
                         }
                     }
                 }
+            }
+        }
+
+        // 4. Raw string representation (lines of file paths or file URLs)
+        if let string = pasteboard.string(forType: .string) {
+            for line in string.components(separatedBy: .newlines) {
+                addPathString(line)
             }
         }
 
@@ -74,8 +92,9 @@ public enum FileDropResolver {
 
         for provider in providers {
             if let url = await resolveSingleURL(from: provider) {
-                if !results.contains(where: { $0.path == url.path }) {
-                    results.append(url)
+                let standardized = url.standardizedFileURL
+                if !results.contains(where: { $0.path == standardized.path || $0.path == url.path }) {
+                    results.append(standardized)
                 }
             }
         }
@@ -84,47 +103,76 @@ public enum FileDropResolver {
     }
 
     private static func resolveSingleURL(from provider: NSItemProvider) async -> URL? {
-        // 1. Modern loadObject for URL
-        if provider.canLoadObject(ofClass: URL.self) {
+        // 1. Load object using NSURL.self (conforms to NSItemProviderReading in Objective-C runtime)
+        if provider.canLoadObject(ofClass: NSURL.self) {
             let loaded: URL? = await withCheckedContinuation { continuation in
-                _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                    continuation.resume(returning: url)
+                _ = provider.loadObject(ofClass: NSURL.self) { nsURL, _ in
+                    if let ns = nsURL as? NSURL {
+                        continuation.resume(returning: ns as URL)
+                    } else if let u = nsURL as? URL {
+                        continuation.resume(returning: u)
+                    } else {
+                        continuation.resume(returning: nil)
+                    }
                 }
             }
-            if let url = loaded, url.isFileURL && FileManager.default.fileExists(atPath: url.path) {
+            if let url = loaded {
                 return url
             }
         }
 
-        // 2. Load item for UTType.fileURL and conforming file types
-        let fileTypes = [UTType.fileURL.identifier, UTType.item.identifier, UTType.content.identifier, "public.file-url"]
-        for typeIdentifier in fileTypes where provider.hasItemConformingToTypeIdentifier(typeIdentifier) {
+        // 2. Load item for conforming file UTIs
+        let typesToTry = [
+            UTType.fileURL.identifier,
+            "public.file-url",
+            UTType.item.identifier,
+            UTType.content.identifier,
+            UTType.data.identifier
+        ]
+
+        for typeIdentifier in typesToTry where provider.hasItemConformingToTypeIdentifier(typeIdentifier) {
             let loaded: URL? = await withCheckedContinuation { continuation in
                 provider.loadItem(forTypeIdentifier: typeIdentifier, options: nil) { item, _ in
-                    var candidate: URL? = nil
+                    if let ns = item as? NSURL {
+                        continuation.resume(returning: ns as URL)
+                        return
+                    }
                     if let url = item as? URL {
-                        candidate = url
-                    } else if let data = item as? Data {
+                        continuation.resume(returning: url)
+                        return
+                    }
+                    if let data = item as? Data {
+                        if let u = URL(dataRepresentation: data, relativeTo: nil) {
+                            continuation.resume(returning: u)
+                            return
+                        }
                         if let str = String(data: data, encoding: .utf8) {
                             let clean = str.trimmingCharacters(in: .whitespacesAndNewlines)
                             if let u = URL(string: clean), u.isFileURL {
-                                candidate = u
-                            } else if clean.hasPrefix("/") {
-                                candidate = URL(fileURLWithPath: clean)
+                                continuation.resume(returning: u)
+                                return
+                            }
+                            if clean.hasPrefix("/") {
+                                continuation.resume(returning: URL(fileURLWithPath: clean))
+                                return
                             }
                         }
-                    } else if let str = item as? String {
+                    }
+                    if let str = item as? String {
                         let clean = str.trimmingCharacters(in: .whitespacesAndNewlines)
                         if let u = URL(string: clean), u.isFileURL {
-                            candidate = u
-                        } else if clean.hasPrefix("/") {
-                            candidate = URL(fileURLWithPath: clean)
+                            continuation.resume(returning: u)
+                            return
+                        }
+                        if clean.hasPrefix("/") {
+                            continuation.resume(returning: URL(fileURLWithPath: clean))
+                            return
                         }
                     }
-                    continuation.resume(returning: candidate)
+                    continuation.resume(returning: nil)
                 }
             }
-            if let url = loaded, FileManager.default.fileExists(atPath: url.path) {
+            if let url = loaded {
                 return url
             }
         }
