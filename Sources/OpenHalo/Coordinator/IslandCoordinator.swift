@@ -95,7 +95,7 @@ public final class IslandCoordinator: ObservableObject {
             switch activeTab {
             case .calendar: return 290 + notchHeight
             case .mirror: return 245 + notchHeight
-            case .media: return 205 + notchHeight
+            case .media: return (mediaService.upcomingQueue.isEmpty ? 205 : 235) + notchHeight
             case .timers: return 195 + notchHeight
             case .system: return 220 + notchHeight
             case .shelf: return 185 + notchHeight

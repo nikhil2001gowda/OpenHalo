@@ -212,6 +212,44 @@ public struct MediaExpandedView: View {
                 .frame(width: 130)
             }
             .padding(.top, 2)
+
+            // Playing Next Queue Drawer (Droppy Parity)
+            if isTrackActive, let nextTrack = mediaService.upcomingQueue.first {
+                HStack(spacing: 8) {
+                    Image(systemName: "forward.end.fill")
+                        .font(.system(size: 8))
+                        .foregroundColor(Color.white.opacity(0.6))
+
+                    Text("Playing Next:")
+                        .font(.system(size: 9.5, weight: .semibold))
+                        .foregroundColor(Color.white.opacity(0.6))
+
+                    Text("\(nextTrack.title) • \(nextTrack.artist)")
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Button(action: {
+                        mediaService.nextTrack()
+                    }) {
+                        Text("Play Now")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(sourceColor(mediaService.currentTrack.source))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(sourceColor(mediaService.currentTrack.source).opacity(0.18))
+                            .cornerRadius(4)
+                    }
+                    .buttonStyle(.plain)
+                    .pointingHandCursor()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4.5)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(6)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

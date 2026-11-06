@@ -7,6 +7,7 @@ import CoreAudio
 public final class MediaService: ObservableObject {
     @Published public var currentTrack: MediaTrack = MediaTrack()
     @Published public var isAvailable: Bool = false
+    @Published public var upcomingQueue: [PlayingNextTrack] = []
 
     private var cancellables = Set<AnyCancellable>()
     private var progressTimer: Timer?
@@ -164,6 +165,9 @@ public final class MediaService: ObservableObject {
         )
         isAvailable = isPlaying
         updateProgressTimer()
+        Task { [weak self] in
+            await self?.fetchUpcomingQueue()
+        }
     }
 
     @objc private func handleSpotifyNotification(_ notification: Notification) {
@@ -190,6 +194,9 @@ public final class MediaService: ObservableObject {
         )
         isAvailable = isPlaying
         updateProgressTimer()
+        Task { [weak self] in
+            await self?.fetchUpcomingQueue()
+        }
     }
 
     private func updateProgressTimer() {
@@ -322,6 +329,53 @@ public final class MediaService: ObservableObject {
         }
         if let upEvent = NSEvent.otherEvent(with: .systemDefined, location: .zero, modifierFlags: upFlags, timestamp: 0, windowNumber: 0, context: nil, subtype: 8, data1: dataUp, data2: -1)?.cgEvent {
             upEvent.post(tap: .cghidEventTap)
+        }
+    }
+
+    // MARK: - Playing Next Queue Fetcher (Apple Music & Spotify)
+
+    public func fetchUpcomingQueue() async {
+        guard currentTrack.isPlaying else {
+            self.upcomingQueue = []
+            return
+        }
+
+        if currentTrack.source == .appleMusic && Self.isAppRunning(bundleID: "com.apple.Music") {
+            let script = """
+            tell application id "com.apple.Music"
+                if player state is playing then
+                    try
+                        set curIndex to index of current track
+                        set allTracks to (tracks of current playlist)
+                        set totalCount to count of allTracks
+                        set output to ""
+                        set collected to 0
+                        repeat with i from (curIndex + 1) to totalCount
+                            if collected >= 3 then exit repeat
+                            set trk to item i of allTracks
+                            set output to output & (name of trk) & "---" & (artist of trk) & "---" & (duration of trk as integer) & "\\n"
+                            set collected to collected + 1
+                        end repeat
+                        return output
+                    end try
+                end if
+            end tell
+            return ""
+            """
+            if let result = await AppleScriptRunner.run(script), !result.isEmpty {
+                let lines = result.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                var items: [PlayingNextTrack] = []
+                for line in lines {
+                    let parts = line.components(separatedBy: "---")
+                    if parts.count >= 2 {
+                        let title = parts[0].trimmingCharacters(in: .whitespaces)
+                        let artist = parts[1].trimmingCharacters(in: .whitespaces)
+                        let dur = Double(parts.count >= 3 ? parts[2].trimmingCharacters(in: .whitespaces) : "0") ?? 0
+                        items.append(PlayingNextTrack(title: title, artist: artist, duration: dur, source: .appleMusic))
+                    }
+                }
+                self.upcomingQueue = items
+            }
         }
     }
 

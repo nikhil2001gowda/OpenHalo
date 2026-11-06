@@ -102,3 +102,32 @@ public struct MediaTrack: Equatable, Sendable {
         return String(format: "%d:%02d", mins, secs)
     }
 }
+
+public struct PlayingNextTrack: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let title: String
+    public let artist: String
+    public let duration: TimeInterval
+    public let source: MusicSource
+
+    public init(
+        id: String = UUID().uuidString,
+        title: String,
+        artist: String,
+        duration: TimeInterval = 0,
+        source: MusicSource = .appleMusic
+    ) {
+        self.id = id
+        self.title = title
+        self.artist = artist
+        self.duration = duration
+        self.source = source
+    }
+
+    public var formattedDuration: String {
+        guard duration > 0 else { return "" }
+        let mins = Int(duration) / 60
+        let secs = Int(duration) % 60
+        return String(format: "%d:%02d", mins, secs)
+    }
+}
