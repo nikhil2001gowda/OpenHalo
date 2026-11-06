@@ -43,7 +43,7 @@ public struct MirrorExpandedView: View {
             } else {
                 // Live Viewfinder
                 ZStack(alignment: .topLeading) {
-                    SimpleCameraPreviewView(session: mirrorService.session)
+                    GlancePreviewView(session: mirrorService.session)
                         .frame(width: 320, height: 140)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .overlay(

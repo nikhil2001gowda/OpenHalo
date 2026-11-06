@@ -3,6 +3,7 @@ import Foundation
 import Vision
 import AppKit
 import SwiftUI
+import Combine
 
 public enum ScreenLockFaceState: Equatable, Sendable {
     case idle
@@ -14,7 +15,7 @@ public enum ScreenLockFaceState: Equatable, Sendable {
 }
 
 @MainActor
-public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+public final class ScreenLockFaceService: NSObject, ObservableObject {
     public static let shared = ScreenLockFaceService()
 
     @Published public var state: ScreenLockFaceState = .idle
@@ -24,12 +25,49 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         }
     }
     @Published public var hasEnrolledFace: Bool = false
-    @Published public var isAccessibilityGranted: Bool = KeystrokeInjector.isAccessibilityTrusted()
+    @Published public var isAccessibilityGranted: Bool = GlanceKeystrokeInjector.isAccessibilityTrusted()
     @Published public var lastRecognitionTimestamp: Date? = nil
     @Published public var statusMessage: String = "Idle"
 
+    // Interactive Enrollment Properties
+    @Published public var isEnrolling: Bool = false
+    @Published public var enrollmentProgress: Double = 0.0
+    @Published public var enrollmentGuidance: String = "Position your face within the frame"
+    @Published public var isEnrollmentComplete: Bool = false
+    @Published public var detectedFaceInFrame: Bool = false
+    @Published public var activeSession: AVCaptureSession? = nil
+
+    private let enrollmentKey = "OpenHalo.FaceID.EnrolledSignature.v2"
+    private var enrolledEmbedding: [Float] = []
+    private var collectedEnrollmentEmbeddings: [[Float]] = []
+
+    // Glance Camera & Processing
+    private let cameraManager = GlanceCameraManager.shared
+    private var cancellables = Set<AnyCancellable>()
+    private var watchdogTimer: DispatchWorkItem?
+    private var countdownTimer: Timer?
+    private var scanStartTime: Date?
+    private let maxScanDuration: TimeInterval = 5.0
+    private var isProcessingFrame = false
+
+    public override init() {
+        super.init()
+        self.isFaceAssistEnabled = UserDefaults.standard.bool(forKey: "OpenHalo.FaceID.Enabled")
+        loadEnrolledFace()
+        registerScreenLockObservers()
+        bindCameraFrames()
+
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.checkAccessibilityPermission()
+        }
+    }
+
     public func checkAccessibilityPermission() {
-        let trusted = KeystrokeInjector.isAccessibilityTrusted()
+        let trusted = GlanceKeystrokeInjector.isAccessibilityTrusted()
         if self.isAccessibilityGranted != trusted {
             self.isAccessibilityGranted = trusted
         }
@@ -39,7 +77,7 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
-        KeystrokeInjector.promptForAccessibility()
+        GlanceKeystrokeInjector.promptForAccessibility()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             self?.checkAccessibilityPermission()
         }
@@ -60,46 +98,7 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         openAccessibilitySettings()
     }
 
-    // Interactive Enrollment Properties
-    @Published public var isEnrolling: Bool = false
-    @Published public var enrollmentProgress: Double = 0.0
-    @Published public var enrollmentGuidance: String = "Position your face within the frame"
-    @Published public var isEnrollmentComplete: Bool = false
-    @Published public var detectedFaceInFrame: Bool = false
-    @Published public var activeSession: AVCaptureSession? = nil
-
-    private let enrollmentKey = "OpenHalo.FaceID.EnrolledSignature"
-    private var enrolledRatios: [Float] = []
-    private var collectedEnrollmentRatios: [[Float]] = []
-
-    // AVCapture properties
-    private var captureSession: AVCaptureSession?
-    private let sessionQueue = DispatchQueue(label: "com.openhalo.facelock.queue", qos: .userInitiated)
-    private var watchdogTimer: DispatchWorkItem?
-    private var countdownTimer: Timer?
-    private var scanStartTime: Date?
-    private let maxScanDuration: TimeInterval = 5.0
-
-    public override init() {
-        super.init()
-        self.isFaceAssistEnabled = UserDefaults.standard.bool(forKey: "OpenHalo.FaceID.Enabled")
-        loadEnrolledFace()
-        registerScreenLockObservers()
-
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didBecomeActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.checkAccessibilityPermission()
-        }
-    }
-
-    deinit {
-        DistributedNotificationCenter.default().removeObserver(self)
-    }
-
-    // MARK: - Screen Lock Observers
+    // MARK: - Glance Screen Lock & Wake Observers
 
     private func registerScreenLockObservers() {
         GlanceLockMonitor.shared.onLockStateChanged = { [weak self] event in
@@ -140,20 +139,20 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         }
     }
 
-    // MARK: - 5-Second Camera Burst Pipeline
+    // MARK: - Glance 5-Second Face ID Scan Pipeline
 
     public func start5SecondFaceScan() {
         guard isFaceAssistEnabled else { return }
-        guard captureSession == nil else { return }
+        guard !cameraManager.isRunning else { return }
 
         self.scanStartTime = Date()
         self.state = .scanning(remainingSeconds: 5.0)
-        self.statusMessage = "Scanning Face (5s limit)..."
+        self.statusMessage = "Scanning Face (Glance Engine)..."
 
-        // Show Dynamic Island scanning animation
+        // Show Dynamic Island scanning animation atop lock screen
         IslandCoordinator.shared.showFaceIDScan(isScanning: true, isUnlocked: false)
 
-        // Arm strict 5.0-second hardware watchdog
+        // Strict 5.0s watchdog
         watchdogTimer?.cancel()
         let watchdog = DispatchWorkItem { [weak self] in
             Task { @MainActor [weak self] in
@@ -184,51 +183,9 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
             }
         }
 
-        // Start capture on background queue
-        sessionQueue.async { [weak self] in
-            guard let self = self else { return }
-            self.configureAndStartCapture()
-        }
-    }
-
-    private nonisolated func configureAndStartCapture() {
-        let session = AVCaptureSession()
-        session.sessionPreset = .vga640x480
-
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
-                ?? AVCaptureDevice.default(for: .video) else {
-            Task { @MainActor [weak self] in
-                self?.stopAndCleanup()
-                self?.state = .failed(reason: "No front camera available")
-            }
-            return
-        }
-
-        do {
-            let input = try AVCaptureDeviceInput(device: device)
-            if session.canAddInput(input) {
-                session.addInput(input)
-            }
-
-            let output = AVCaptureVideoDataOutput()
-            output.alwaysDiscardsLateVideoFrames = true
-            output.setSampleBufferDelegate(self, queue: sessionQueue)
-
-            if session.canAddOutput(output) {
-                session.addOutput(output)
-            }
-
-            session.startRunning()
-
-            Task { @MainActor [weak self] in
-                self?.captureSession = session
-                self?.activeSession = session
-            }
-        } catch {
-            Task { @MainActor [weak self] in
-                self?.stopAndCleanup()
-                self?.state = .failed(reason: error.localizedDescription)
-            }
+        Task {
+            _ = await self.cameraManager.start()
+            self.activeSession = self.cameraManager.session
         }
     }
 
@@ -238,105 +195,78 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         countdownTimer?.invalidate()
         countdownTimer = nil
 
-        let session = captureSession
-        captureSession = nil
+        cameraManager.stop()
         activeSession = nil
-
-        sessionQueue.async {
-            session?.stopRunning()
-        }
+        isProcessingFrame = false
     }
 
-    // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
+    // MARK: - Frame Processing via Glance Architecture
 
-    public nonisolated func captureOutput(
-        _ output: AVCaptureOutput,
-        didOutput sampleBuffer: CMSampleBuffer,
-        from connection: AVCaptureConnection
-    ) {
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+    private func bindCameraFrames() {
+        cameraManager.$currentFrame
+            .compactMap { $0 }
+            .receive(on: DispatchQueue.global(qos: .userInitiated))
+            .sink { [weak self] frame in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    guard !self.isProcessingFrame else { return }
+                    self.isProcessingFrame = true
+                    await self.processCameraFrame(frame)
+                    self.isProcessingFrame = false
+                }
+            }
+            .store(in: &cancellables)
+    }
 
-        // Vision Landmark & Quality Request
-        let landmarksRequest = VNDetectFaceLandmarksRequest()
-        let qualityRequest = VNDetectFaceCaptureQualityRequest()
-
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
-
+    private func processCameraFrame(_ frame: GlanceCameraFrame) async {
         do {
-            try handler.perform([landmarksRequest, qualityRequest])
-
-            guard let face = landmarksRequest.results?.first else {
+            let faces = try GlanceFaceDetector.detectFaces(in: frame.image)
+            guard let face = faces.first else {
+                if isEnrolling {
+                    self.detectedFaceInFrame = false
+                }
                 return
             }
 
-            // Quality filter (anti-blur / glare)
-            let qualityScore: Float = qualityRequest.results?.first?.faceCaptureQuality ?? 0.5
-            guard qualityScore >= 0.35 else { return }
+            guard let crop = GlanceFaceDetector.crop(face, from: frame.image) else { return }
 
-            // Extract geometric ratios
-            let ratios = self.extractGeometricRatios(from: face)
-            let yawVal = face.yaw?.doubleValue ?? 0.0
-            let pitchVal = face.pitch?.doubleValue ?? 0.0
-
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
-                if self.isEnrolling {
-                    self.processEnrollmentFrame(ratios: ratios, quality: qualityScore, yaw: yawVal, pitch: pitchVal)
-                } else {
-                    self.evaluateFrame(ratios: ratios, quality: qualityScore)
-                }
+            if isEnrolling {
+                self.detectedFaceInFrame = true
+                let yaw = Double(face.yaw ?? 0)
+                let pitch = Double(face.pitch ?? 0)
+                await self.processEnrollmentStep(crop: crop, yaw: yaw, pitch: pitch)
+            } else if case .scanning = state {
+                await self.evaluateUnlockScan(crop: crop, quality: face.quality ?? 0.5)
             }
         } catch {
-            // Silently continue until 5s timeout
+            // Continue frame processing
         }
     }
 
-    private nonisolated func extractGeometricRatios(from face: VNFaceObservation) -> [Float] {
-        let bbox = face.boundingBox
-        var ratios: [Float] = [
-            Float(bbox.width / max(0.001, bbox.height)) // Aspect ratio
-        ]
-
-        if let landmarks = face.landmarks {
-            if let leftEye = landmarks.leftEye, let rightEye = landmarks.rightEye,
-               leftEye.pointCount > 0, rightEye.pointCount > 0 {
-                let leftPts = leftEye.normalizedPoints
-                let rightPts = rightEye.normalizedPoints
-                let leftX = leftPts.reduce(0.0) { $0 + $1.x } / CGFloat(leftPts.count)
-                let rightX = rightPts.reduce(0.0) { $0 + $1.x } / CGFloat(rightPts.count)
-                let eyeDistance = Float(abs(rightX - leftX))
-                ratios.append(eyeDistance)
-            }
-            if let nose = landmarks.nose, nose.pointCount > 0 {
-                let nosePts = nose.normalizedPoints
-                let noseY = nosePts.reduce(0.0) { $0 + $1.y } / CGFloat(nosePts.count)
-                ratios.append(Float(noseY))
-            }
-        }
-
-        return ratios
-    }
-
-    @MainActor
-    private func evaluateFrame(ratios: [Float], quality: Float) {
+    private func evaluateUnlockScan(crop: CGImage, quality: Float) async {
         guard case .scanning = state else { return }
 
-        // If no enrolled profile, any clear face on lock wake satisfies test verification
-        if enrolledRatios.isEmpty {
+        // If no enrolled profile, any clear face satisfies test scan
+        if enrolledEmbedding.isEmpty {
             recordSuccessfulRecognition(confidence: quality)
             return
         }
 
-        // Compare with enrolled signature
-        let diff = compareRatios(ratios, enrolledRatios)
-        if diff < 0.25 {
-            recordSuccessfulRecognition(confidence: 1.0 - diff)
+        do {
+            let liveEmbedding = try GlanceFaceEmbedding.generateEmbedding(for: crop)
+            let similarity = GlanceFaceEmbedding.cosineSimilarity(enrolledEmbedding, liveEmbedding)
+
+            // Glance matching threshold: cosine similarity >= 0.65
+            if similarity >= 0.65 {
+                recordSuccessfulRecognition(confidence: similarity)
+            }
+        } catch {
+            // Keep scanning until timeout
         }
     }
 
-    @MainActor
     private func recordSuccessfulRecognition(confidence: Float) {
-        // IMMEDIATELY hard stop camera
+        // Hard stop camera immediately
         stopAndCleanup()
 
         self.state = .recognized(confidence: confidence)
@@ -345,65 +275,53 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
 
         SoundEffectManager.playActionBeep()
 
-        // 1. Trigger Dynamic Island Face ID Unlock Animation
+        // 1. Dynamic Island Face ID Unlock Animation
         IslandCoordinator.shared.showFaceIDScan(isScanning: false, isUnlocked: true)
 
-        // 2. If password is saved in Keychain, inject hardware keystrokes to unlock macOS
+        // 2. Inject Password via Glance Keystroke Injector
         if let password = KeychainHelper.getPassword(), !password.isEmpty {
-            DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.25) {
+            DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.3) {
                 KeychainHelper.unlockLockScreen(password: password)
             }
         }
     }
 
-    private func compareRatios(_ a: [Float], _ b: [Float]) -> Float {
-        let count = min(a.count, b.count)
-        guard count > 0 else { return 1.0 }
-        var sumDiff: Float = 0.0
-        for i in 0..<count {
-            sumDiff += abs(a[i] - b[i])
-        }
-        return sumDiff / Float(count)
-    }
-
-    // MARK: - Interactive iPhone-Style Face ID Enrollment
+    // MARK: - Glance Interactive Enrollment
 
     public func startInteractiveEnrollment() {
         self.isEnrolling = true
         self.isEnrollmentComplete = false
         self.enrollmentProgress = 0.0
         self.enrollmentGuidance = "Position your face in the center"
-        self.collectedEnrollmentRatios = []
+        self.collectedEnrollmentEmbeddings = []
         self.detectedFaceInFrame = false
 
-        sessionQueue.async { [weak self] in
-            guard let self = self else { return }
-            self.configureAndStartCapture()
+        Task {
+            _ = await self.cameraManager.start()
+            self.activeSession = self.cameraManager.session
         }
     }
 
     public func stopInteractiveEnrollment() {
         self.isEnrolling = false
-        self.stopAndCleanup()
+        stopAndCleanup()
     }
 
-    @MainActor
-    public func processEnrollmentFrame(ratios: [Float], quality: Float, yaw: Double, pitch: Double) {
+    private func processEnrollmentStep(crop: CGImage, yaw: Double, pitch: Double) async {
         guard isEnrolling && !isEnrollmentComplete else { return }
-        self.detectedFaceInFrame = true
-        self.collectedEnrollmentRatios.append(ratios)
 
-        // Track 3D head rotation around the Face ID circle
+        if let embedding = try? GlanceFaceEmbedding.generateEmbedding(for: crop) {
+            collectedEnrollmentEmbeddings.append(embedding)
+        }
+
         let current = enrollmentProgress
 
         if current < 0.3 {
-            // Step 1: Center
             self.enrollmentGuidance = "Look directly at the camera"
             if abs(yaw) < 0.25 {
                 enrollmentProgress = min(0.3, current + 0.04)
             }
         } else if current < 0.55 {
-            // Step 2: Turn Left
             self.enrollmentGuidance = "Slowly turn your head to the left"
             if yaw < -0.15 {
                 enrollmentProgress = min(0.55, current + 0.04)
@@ -411,7 +329,6 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
                 enrollmentProgress = min(0.55, current + 0.015)
             }
         } else if current < 0.8 {
-            // Step 3: Turn Right
             self.enrollmentGuidance = "Slowly turn your head to the right"
             if yaw > 0.15 {
                 enrollmentProgress = min(0.8, current + 0.04)
@@ -419,7 +336,6 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
                 enrollmentProgress = min(0.8, current + 0.015)
             }
         } else if current < 1.0 {
-            // Step 4: Tilt slightly
             self.enrollmentGuidance = "Tilt your head slightly up and down"
             if abs(pitch) > 0.08 {
                 enrollmentProgress = min(1.0, current + 0.05)
@@ -433,49 +349,48 @@ public final class ScreenLockFaceService: NSObject, ObservableObject, AVCaptureV
         }
     }
 
-    @MainActor
     private func finishEnrollment() {
         self.isEnrollmentComplete = true
         self.enrollmentGuidance = "Face ID is Ready!"
-        self.stopAndCleanup()
+        stopAndCleanup()
 
-        // Compute averaged high-precision signature from captured angles
-        if !collectedEnrollmentRatios.isEmpty {
-            let numFeatures = collectedEnrollmentRatios[0].count
-            var averaged: [Float] = Array(repeating: 0.0, count: numFeatures)
-            for sample in collectedEnrollmentRatios {
-                for i in 0..<min(numFeatures, sample.count) {
+        if !collectedEnrollmentEmbeddings.isEmpty {
+            let dim = collectedEnrollmentEmbeddings[0].count
+            var averaged: [Float] = Array(repeating: 0.0, count: dim)
+            for sample in collectedEnrollmentEmbeddings {
+                for i in 0..<min(dim, sample.count) {
                     averaged[i] += sample[i]
                 }
             }
-            let count = Float(collectedEnrollmentRatios.count)
-            self.enrolledRatios = averaged.map { $0 / count }
+            let count = Float(collectedEnrollmentEmbeddings.count)
+            let averagedVec = averaged.map { $0 / count }
+            self.enrolledEmbedding = GlanceFaceEmbedding.l2Normalized(averagedVec)
         } else {
-            self.enrolledRatios = [0.75, 0.32, 0.45]
+            self.enrolledEmbedding = []
         }
 
-        UserDefaults.standard.set(self.enrolledRatios, forKey: self.enrollmentKey)
+        UserDefaults.standard.set(self.enrolledEmbedding, forKey: self.enrollmentKey)
         self.hasEnrolledFace = true
-        self.statusMessage = "Face Profile Enrolled (Local Key)"
+        self.statusMessage = "Face Profile Enrolled (Glance Engine)"
 
         SoundEffectManager.playActionBeep()
     }
 
-    public func enrollCurrentFace() {
-        startInteractiveEnrollment()
-    }
-
     private func loadEnrolledFace() {
         if let stored = UserDefaults.standard.array(forKey: enrollmentKey) as? [Float], !stored.isEmpty {
-            self.enrolledRatios = stored
+            self.enrolledEmbedding = stored
             self.hasEnrolledFace = true
         }
     }
 
     public func clearEnrolledFace() {
         UserDefaults.standard.removeObject(forKey: enrollmentKey)
-        self.enrolledRatios = []
+        self.enrolledEmbedding = []
         self.hasEnrolledFace = false
         self.statusMessage = "Face profile removed"
+    }
+
+    public func enrollCurrentFace() {
+        startInteractiveEnrollment()
     }
 }

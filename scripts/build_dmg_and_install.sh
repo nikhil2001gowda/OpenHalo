@@ -76,8 +76,8 @@ cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
 </plist>
 EOF
 
-echo "🔏 Signing ${APP_NAME}..."
-codesign --force --deep -s - "${APP_BUNDLE}" 2>/dev/null || true
+echo "🔏 Signing ${APP_NAME} with stable designated requirement..."
+codesign --force --deep -s - --requirements '=designated => identifier "com.openhalo.app"' "${APP_BUNDLE}" 2>/dev/null || true
 
 # 1. Install directly to /Applications (or ~/Applications)
 TARGET_APP="/Applications/${APP_NAME}"
@@ -93,7 +93,7 @@ sleep 0.5
 
 rm -rf "${TARGET_APP}"
 cp -R "${APP_BUNDLE}" "${TARGET_APP}"
-codesign --force --deep -s - "${TARGET_APP}" 2>/dev/null || true
+codesign --force --deep -s - --requirements '=designated => identifier "com.openhalo.app"' "${TARGET_APP}" 2>/dev/null || true
 
 # 2. Generate OpenHalo.dmg
 echo "💿 Creating standalone OpenHalo.dmg..."

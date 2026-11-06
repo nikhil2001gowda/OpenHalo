@@ -149,3 +149,4 @@ public enum KeystrokeInjector {
         keyUp.post(tap: .cghidEventTap)
     }
 }
+

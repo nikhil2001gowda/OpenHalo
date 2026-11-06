@@ -44,7 +44,7 @@ public struct FaceIDEnrollmentView: View {
                 // Live Camera Circle
                 ZStack {
                     if let session = faceService.activeSession {
-                        CameraPreviewRepresentable(session: session)
+                        GlancePreviewView(session: session)
                             .frame(width: 176, height: 176)
                             .clipShape(Circle())
                     } else {

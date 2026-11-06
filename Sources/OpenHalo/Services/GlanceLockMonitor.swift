@@ -129,3 +129,4 @@ public final class GlanceLockMonitor: ObservableObject {
         return (dict["CGSSessionScreenIsLocked"] as? Bool) ?? false
     }
 }
+
