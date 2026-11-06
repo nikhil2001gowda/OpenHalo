@@ -272,7 +272,17 @@ final class FaceUnlockCoordinator {
         // A newer cycle now owns the camera and overlay — leave both alone, and leave the auto-retry one-shot unspent.
         guard generation == scanGeneration else { return }
 
-        camera.stop()
+        let willRetry: Bool
+        switch outcome {
+        case .matched:
+            willRetry = false
+        case .consistentlyWrongFace, .spoofSuspected, .noResolution:
+            willRetry = GlanceSettings.shared.autoRetryOnce && !hasAutoRetriedForCurrentLock
+        }
+
+        if !willRetry {
+            camera.stop()
+        }
 
         switch outcome {
         case .matched:
@@ -284,9 +294,8 @@ final class FaceUnlockCoordinator {
             statusMessage = "Face not recognized."
             if showsUI {
                 NotchOverlayController.shared.finish(success: false)
-                let willRetry = GlanceSettings.shared.autoRetryOnce && !hasAutoRetriedForCurrentLock
                 statusMessage = willRetry ? "Face not recognized — retrying…" : "Face not recognized — hover the notch to try again."
-                scheduleAutoRetryIfEnabled(after: .milliseconds(1200))
+                scheduleAutoRetryIfEnabled(after: .milliseconds(900))
             } else {
                 scheduleAutoRetryIfEnabled(after: headlessRetryDelay)
             }
@@ -294,9 +303,8 @@ final class FaceUnlockCoordinator {
             statusMessage = "Couldn't confirm a live face."
             if showsUI {
                 NotchOverlayController.shared.finish(success: false)
-                let willRetry = GlanceSettings.shared.autoRetryOnce && !hasAutoRetriedForCurrentLock
                 statusMessage = willRetry ? "Couldn't confirm a live face — retrying…" : "Couldn't confirm a live face — hover the notch to try again."
-                scheduleAutoRetryIfEnabled(after: .milliseconds(1200))
+                scheduleAutoRetryIfEnabled(after: .milliseconds(900))
             } else {
                 scheduleAutoRetryIfEnabled(after: headlessRetryDelay)
             }
@@ -304,9 +312,8 @@ final class FaceUnlockCoordinator {
             statusMessage = "No face detected."
             if showsUI {
                 // No explicit collapse call: NotchOverlayController's own scanning timeout fires on the same mark and collapses itself.
-                let willRetry = GlanceSettings.shared.autoRetryOnce && !hasAutoRetriedForCurrentLock
                 statusMessage = willRetry ? "No face detected — retrying…" : "No face detected — hover the notch to try again."
-                scheduleAutoRetryIfEnabled(after: .milliseconds(700))
+                scheduleAutoRetryIfEnabled(after: .milliseconds(600))
             } else {
                 scheduleAutoRetryIfEnabled(after: headlessRetryDelay)
             }
@@ -322,7 +329,10 @@ final class FaceUnlockCoordinator {
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled, let self else { return }
             // Re-check rather than trust the delay: the user may have unlocked by password or retried manually while this waited.
-            guard LockMonitor.isScreenActuallyLocked(), self.isEnabled else { return }
+            guard LockMonitor.isScreenActuallyLocked(), self.isEnabled else {
+                self.camera.stop()
+                return
+            }
             self.startScanCycle()
         }
     }

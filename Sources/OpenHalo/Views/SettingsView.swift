@@ -1180,6 +1180,7 @@ struct SidebarItemButton: View {
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
+        .focusable(false)
         .focusEffectDisabled()
         .pointingHandCursor()
         .onHover { hovering in

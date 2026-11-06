@@ -91,8 +91,26 @@ public final class IslandPanel: NSPanel, NSDraggingDestination {
         false
     }
 
+    private var lastSwipeSkipTime: Date = .distantPast
+
     public override func scrollWheel(with event: NSEvent) {
-        if event.deltaY < -1.5 {
+        let absX = abs(event.deltaX)
+        let absY = abs(event.deltaY)
+
+        // Droppy Parity: Horizontal 2-finger swipe over compact pill skips songs without opening the panel
+        if absX > absY && absX > 2.0 {
+            Task { @MainActor in
+                let coordinator = IslandCoordinator.shared
+                if !coordinator.state.isExpanded && Date().timeIntervalSince(self.lastSwipeSkipTime) > 0.5 {
+                    self.lastSwipeSkipTime = Date()
+                    if event.deltaX < -2.0 {
+                        coordinator.mediaService.nextTrack()
+                    } else if event.deltaX > 2.0 {
+                        coordinator.mediaService.previousTrack()
+                    }
+                }
+            }
+        } else if event.deltaY < -1.5 {
             // Swipe / scroll down opens the shelf
             Task { @MainActor in
                 let coordinator = IslandCoordinator.shared

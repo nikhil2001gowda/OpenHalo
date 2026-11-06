@@ -182,6 +182,7 @@ final class NotchOverlayController {
         activeUnlockStyle = GlanceSettings.shared.effectiveUnlockAnimationStyle
         content = .scan(.idle)
         phase = .scanning
+        windowController.show()
         updateInteractivity()
 
         scanTimeoutTask = Task { [weak self] in
