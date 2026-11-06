@@ -20,8 +20,8 @@ public struct FocusNoteExpandedView: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)
-                    .onTapGesture {
-                        IslandCoordinator.shared.setKeyboardFocus(true)
+                    .onSubmit {
+                        focusService.setHeadline(focusService.currentFocusHeadline)
                     }
 
                 Spacer()
@@ -39,9 +39,6 @@ public struct FocusNoteExpandedView: View {
                     .foregroundColor(.white)
                     .onSubmit {
                         submitNewTask()
-                    }
-                    .onTapGesture {
-                        IslandCoordinator.shared.setKeyboardFocus(true)
                     }
 
                 Button(action: {

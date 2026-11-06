@@ -21,9 +21,6 @@ public struct ClipboardExpandedView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
                         .foregroundColor(.white)
-                        .onTapGesture {
-                            IslandCoordinator.shared.setKeyboardFocus(true)
-                        }
 
                     if !clipboardService.searchQuery.isEmpty {
                         Button(action: { clipboardService.searchQuery = "" }) {

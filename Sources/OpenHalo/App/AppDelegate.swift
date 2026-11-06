@@ -16,6 +16,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Launch Dynamic Island window
         IslandWindowController.shared.showIsland(with: AnyView(IslandRootView()))
 
+        // Start Glance Lockscreen Face ID Engine
+        GlanceCoordinator.shared.start()
+
         // Setup global keyboard shortcuts
         setupKeyboardShortcuts()
     }

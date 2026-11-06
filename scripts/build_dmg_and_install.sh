@@ -26,8 +26,8 @@ mkdir -p "${RESOURCES_DIR}"
 
 cp "${PROJECT_DIR}/.build/release/OpenHalo" "${MACOS_DIR}/OpenHalo"
 chmod +x "${MACOS_DIR}/OpenHalo"
-if [ -f "${PROJECT_DIR}/Resources/AppIcon.icns" ]; then
-    cp "${PROJECT_DIR}/Resources/AppIcon.icns" "${RESOURCES_DIR}/AppIcon.icns"
+if [ -d "${PROJECT_DIR}/Resources" ]; then
+    cp -R "${PROJECT_DIR}/Resources/"* "${RESOURCES_DIR}/"
 fi
 
 cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"

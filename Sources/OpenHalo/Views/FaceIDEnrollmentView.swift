@@ -7,10 +7,10 @@ public struct FaceIDEnrollmentView: View {
 
     @MainActor
     public init(
-        faceService: ScreenLockFaceService = ScreenLockFaceService.shared,
+        faceService: ScreenLockFaceService? = nil,
         onDismiss: @escaping () -> Void
     ) {
-        self.faceService = faceService
+        self.faceService = faceService ?? ScreenLockFaceService.shared
         self.onDismiss = onDismiss
     }
 

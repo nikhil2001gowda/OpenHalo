@@ -33,7 +33,7 @@ public final class IslandPanel: NSPanel {
     }
 
     public override var canBecomeKey: Bool {
-        IslandCoordinator.shared.requiresKeyboardFocus
+        IslandCoordinator.shared.state.isExpanded || IslandCoordinator.shared.requiresKeyboardFocus
     }
 
     public override var canBecomeMain: Bool {

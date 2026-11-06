@@ -1,38 +1,45 @@
+//
+//  KeystrokeInjector.swift
+//  glance
+//
+//  Synthesizes keystrokes via CGEvent, posted at the HID tap so they reach the lock screen's secure text field.
+//
+
 import Foundation
 import ApplicationServices
 import CoreGraphics
 
-public enum KeystrokeError: LocalizedError {
+enum KeystrokeError: LocalizedError {
     case accessibilityNotGranted
     case eventCreationFailed
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .accessibilityNotGranted:
-            return "Accessibility permission required. Open System Settings → Privacy & Security → Accessibility and enable OpenHalo."
+            return "Accessibility permission required. Open System Settings → Privacy & Security → Accessibility and enable glance."
         case .eventCreationFailed:
             return "Couldn't create CGEvent for keystroke."
         }
     }
 }
 
-/// Glance-engineered synthetic keystroke injector posted at the HID tap so it reaches the macOS lock screen.
-public enum KeystrokeInjector {
+enum KeystrokeInjector {
     /// Returns true if the app has Accessibility permission (no prompt).
-    public nonisolated static func isAccessibilityTrusted() -> Bool {
+    nonisolated static func isAccessibilityTrusted() -> Bool {
         return AXIsProcessTrusted()
     }
 
     /// Triggers the system prompt to grant Accessibility (deep links to System Settings).
     @discardableResult
-    public nonisolated static func promptForAccessibility() -> Bool {
+    nonisolated static func promptForAccessibility() -> Bool {
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue()
         let options = [promptKey: true] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
     }
 
-    /// Types the UTF-8 bytes into whatever has keyboard focus, then presses Return.
-    public nonisolated static func typeAndReturn(_ passwordBytes: Data) throws {
+    /// Types the UTF-8 bytes into whatever has keyboard focus, then presses Return. Takes `Data` rather than `String` so the
+    /// caller can hold the plaintext as a zero-able buffer; the brief internal `String` decode is scoped to this call. Blocking.
+    nonisolated static func typeAndReturn(_ passwordBytes: Data) throws {
         guard isAccessibilityTrusted() else {
             throw KeystrokeError.accessibilityNotGranted
         }
@@ -45,7 +52,7 @@ public enum KeystrokeInjector {
         try postReturn(source: source)
     }
 
-    public nonisolated static func typePassword(_ password: String) throws {
+    nonisolated static func typePassword(_ password: String) throws {
         guard let data = password.data(using: .utf8) else { return }
         try typeAndReturn(data)
     }
@@ -94,8 +101,12 @@ public enum KeystrokeInjector {
         }
     }
 
-    private nonisolated static let maximumUnicodeBatchLength = 20
-    private nonisolated static let unicodeEventInterval: TimeInterval = 0.005
+    /// Quartz reliably delivers only a small Unicode payload per keyboard event.
+    /// Batching at this conservative limit avoids the undocumented truncation seen
+    /// with longer payloads, while replacing one down/up pair per character with
+    /// one pair per batch.
+    nonisolated private static let maximumUnicodeBatchLength = 20
+    nonisolated private static let unicodeEventInterval: TimeInterval = 0.004
 
     /// Posts the password in small UTF-16 batches. Splitting occurs only between
     /// surrogate pairs, so non-BMP password characters are never corrupted.
@@ -107,7 +118,9 @@ public enum KeystrokeInjector {
 
             while start < buffer.count {
                 var end = min(start + maximumUnicodeBatchLength, buffer.count)
-                if end < buffer.count, (0xD800...0xDBFF).contains(buffer[end - 1]) {
+                // Do not split a high/low-surrogate pair across separate key events.
+                if end < buffer.count,
+                   (0xD800...0xDBFF).contains(buffer[end - 1]) {
                     end -= 1
                 }
                 try postUnicode(
@@ -120,6 +133,9 @@ public enum KeystrokeInjector {
         }
     }
 
+    /// Unicode injection bypasses keyboard-layout issues. The password is placed
+    /// on a key-down event as a text batch; the matching key-up maintains normal
+    /// secure-field event semantics.
     private nonisolated static func postUnicode(
         _ unicode: UnsafePointer<UInt16>,
         length: Int,
@@ -145,8 +161,7 @@ public enum KeystrokeInjector {
             throw KeystrokeError.eventCreationFailed
         }
         keyDown.post(tap: .cghidEventTap)
-        Thread.sleep(forTimeInterval: 0.014)
+        Thread.sleep(forTimeInterval: 0.012)
         keyUp.post(tap: .cghidEventTap)
     }
 }
-

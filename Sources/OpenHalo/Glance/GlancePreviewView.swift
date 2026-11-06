@@ -12,9 +12,14 @@ import AppKit
 
 public struct GlancePreviewView: NSViewRepresentable {
     public let session: AVCaptureSession
-    public var faces: [GlanceDetectedFace] = []
+    var faces: [DetectedFace] = []
 
-    public init(session: AVCaptureSession, faces: [GlanceDetectedFace] = []) {
+    public init(session: AVCaptureSession) {
+        self.session = session
+        self.faces = []
+    }
+
+    init(session: AVCaptureSession, faces: [DetectedFace] = []) {
         self.session = session
         self.faces = faces
     }
@@ -57,7 +62,7 @@ public final class GlancePreviewHostView: NSView {
         CATransaction.commit()
     }
 
-    public func updateFaceBoxes(_ faces: [GlanceDetectedFace]) {
+    func updateFaceBoxes(_ faces: [DetectedFace]) {
         boxLayers.forEach { $0.removeFromSuperlayer() }
         boxLayers = faces.map { face in
             let rect = previewLayer.layerRectConverted(fromMetadataOutputRect: face.normalizedBoundingBox)
@@ -71,3 +76,4 @@ public final class GlancePreviewHostView: NSView {
         }
     }
 }
+

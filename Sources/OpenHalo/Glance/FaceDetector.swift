@@ -1,33 +1,39 @@
 //
-//  GlanceFaceDetector.swift
-//  Glance Engine for OpenHalo
+//  FaceDetector.swift
+//  glance
 //
-//  Directly from jonnyoo/glance: Converts Vision's normalized (0...1), bottom-left-origin
-//  face boxes into pixel-space, top-left-origin CGRects. Chained quality and landmark requests.
+//  Converts Vision's normalized (0...1), bottom-left-origin face boxes into pixel-space, top-left-origin `CGRect`s.
 //
 
 import Vision
 import CoreGraphics
 
-public struct GlanceDetectedFace: Sendable {
+struct DetectedFace {
     /// Pixel-space bounding box, top-left origin — ready to crop with.
-    public let boundingBox: CGRect
-    /// Vision's original normalized box
-    public let normalizedBoundingBox: CGRect
-    /// 0...1 confidence from Vision that this is a face
-    public let quality: Float?
-    /// Head rotation in radians
-    public let yaw: Float?
-    public let roll: Float?
-    public let pitch: Float?
-    /// Facial landmarks
-    public nonisolated let landmarks: VNFaceLandmarks2D?
-    public let imageSize: CGSize
+    let boundingBox: CGRect
+    /// Vision's original normalized box — kept as-is since it's the exact format `layerRectConverted(fromMetadataOutputRect:)` expects.
+    let normalizedBoundingBox: CGRect
+    /// 0...1 confidence from Vision that this is a face, roughly indicating
+    /// image quality/pose suitability for recognition. `nil` if the quality
+    /// request didn't produce a result for this face.
+    let quality: Float?
+    /// Head rotation in radians, when Vision could estimate it. Yaw drives the guided-pose onboarding capture;
+    /// roll and pitch are exposed but unused today.
+    let yaw: Float?
+    let roll: Float?
+    let pitch: Float?
+    /// Facial landmarks (eyes, nose, mouth, etc.), when available. Feeds
+    /// `FaceAligner` for canonical 112x112 alignment ahead of ArcFace.
+    nonisolated let landmarks: VNFaceLandmarks2D?
+    /// Needed by `landmarks.pointsInImage(_:)` to convert normalized landmark points into `boundingBox`'s pixel space.
+    let imageSize: CGSize
 }
 
-public nonisolated enum GlanceFaceDetector {
+/// Pure, synchronous, CPU-bound work — `nonisolated` so it can run on a
+/// background task despite the project's default main-actor isolation.
+nonisolated enum FaceDetector {
     /// Runs face-rectangle, capture-quality, and landmarks detection on a single frame.
-    public static func detectFaces(in image: CGImage) throws -> [GlanceDetectedFace] {
+    static func detectFaces(in image: CGImage) throws -> [DetectedFace] {
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
 
         let rectanglesRequest = VNDetectFaceRectanglesRequest()
@@ -35,7 +41,8 @@ public nonisolated enum GlanceFaceDetector {
         let faceObservations = rectanglesRequest.results ?? []
         guard !faceObservations.isEmpty else { return [] }
 
-        // Chained to rectangles results (via inputFaceObservations) rather than run independently
+        // Chained to the rectangles results (via `inputFaceObservations`) rather than run independently, so results
+        // correspond 1:1 in order — avoids the fragility of matching back via boundingBox float equality.
         let qualityRequest = VNDetectFaceCaptureQualityRequest()
         let landmarksRequest = VNDetectFaceLandmarksRequest()
         qualityRequest.inputFaceObservations = faceObservations
@@ -48,7 +55,7 @@ public nonisolated enum GlanceFaceDetector {
 
         return faceObservations.enumerated().map { index, observation in
             let pixelRect = convertToImageSpace(observation.boundingBox, imageSize: imageSize)
-            return GlanceDetectedFace(
+            return DetectedFace(
                 boundingBox: pixelRect,
                 normalizedBoundingBox: observation.boundingBox,
                 quality: qualityResults.indices.contains(index) ? qualityResults[index].faceCaptureQuality : nil,
@@ -61,8 +68,9 @@ public nonisolated enum GlanceFaceDetector {
         }
     }
 
-    /// Vision's normalized rect has origin at bottom-left; CGImage.cropping expects top-left.
-    public static func convertToImageSpace(_ normalizedRect: CGRect, imageSize: CGSize) -> CGRect {
+    /// Vision's normalized rect has origin at bottom-left; `CGImage.cropping`
+    /// expects pixel coordinates with origin at top-left. This flips the Y axis.
+    static func convertToImageSpace(_ normalizedRect: CGRect, imageSize: CGSize) -> CGRect {
         let x = normalizedRect.origin.x * imageSize.width
         let width = normalizedRect.width * imageSize.width
         let height = normalizedRect.height * imageSize.height
@@ -70,8 +78,9 @@ public nonisolated enum GlanceFaceDetector {
         return CGRect(x: x, y: y, width: width, height: height)
     }
 
-    /// Crops face out of image with padding
-    public static func crop(_ face: GlanceDetectedFace, from image: CGImage, paddingFraction: CGFloat = 0.2) -> CGImage? {
+    /// Crops `face` out of `image`, padding slightly around the detected box
+    /// so the embedder sees a bit of context beyond just eyes/nose/mouth.
+    static func crop(_ face: DetectedFace, from image: CGImage, paddingFraction: CGFloat = 0.2) -> CGImage? {
         let imageBounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
         let padX = face.boundingBox.width * paddingFraction
         let padY = face.boundingBox.height * paddingFraction
