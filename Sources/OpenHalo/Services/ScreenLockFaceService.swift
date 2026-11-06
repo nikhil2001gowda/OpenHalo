@@ -193,6 +193,8 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
     // MARK: - Glance Canonical Guided 9-Pose Enrollment
 
     public func launchGlanceGuidedNotchSweep() {
+        // Collapse island if expanded so the hardware notch area is free for Glance's guided overlay
+        IslandCoordinator.shared.collapseToCompact()
         OnboardingController.startEnrollmentOnly()
     }
 
@@ -406,6 +408,6 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
     }
 
     public func enrollCurrentFace() {
-        startInteractiveEnrollment()
+        launchGlanceGuidedNotchSweep()
     }
 }

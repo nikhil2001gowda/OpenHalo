@@ -9,7 +9,6 @@ public struct SettingsView: View {
     @ObservedObject var weatherService = WeatherService.shared
 
     @State private var glanceSettings = GlanceSettings.shared
-    @State private var isShowingEnrollmentSheet: Bool = false
     @State private var macPassword: String = ""
     @State private var hasStoredPassword: Bool = KeychainHelper.hasPassword()
     @State private var passwordStatusMessage: String? = nil
@@ -181,22 +180,18 @@ public struct SettingsView: View {
             .background(Color.white.opacity(0.04))
             .cornerRadius(6)
 
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Button(action: {
                     faceService.launchGlanceGuidedNotchSweep()
                 }) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "macbook.and.iphone")
-                        Text("Launch Guided Notch Sweep (9 Poses)")
+                    HStack(spacing: 6) {
+                        Image(systemName: "faceid")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(faceService.hasEnrolledFace ? "Re-Enroll Face Profile (Guided Notch)" : "Enroll Face Profile (Guided Notch)")
+                            .font(.system(size: 11, weight: .medium))
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-
-                Button("Modal Enrollment") {
-                    isShowingEnrollmentSheet = true
-                }
-                .buttonStyle(.bordered)
                 .controlSize(.small)
 
                 if faceService.hasEnrolledFace {
@@ -206,9 +201,13 @@ public struct SettingsView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
 
-                    Text("Status: Enrolled (9-Pose Store)")
+                    Text("Status: Enrolled (Glance 9-Pose Store)")
                         .font(.system(size: 10))
                         .foregroundColor(.green)
+                } else {
+                    Text("Authentic Glance Guided Notch Window • 9 Poses")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
                 }
             }
 
@@ -224,14 +223,13 @@ public struct SettingsView: View {
                 Button("Open Settings") {
                     faceService.openAccessibilitySettings()
                 }
+            } else if !faceService.hasEnrolledFace && FaceEnrollmentStore.shared.activeIdentities.isEmpty {
+                Button("Enroll Face Now") {
+                    faceService.launchGlanceGuidedNotchSweep()
+                }
             }
         } message: {
             Text(faceService.permissionErrorMessage ?? "Please ensure all mandatory permissions are granted before enabling Face ID.")
-        }
-        .sheet(isPresented: $isShowingEnrollmentSheet) {
-            FaceIDEnrollmentView(faceService: faceService) {
-                isShowingEnrollmentSheet = false
-            }
         }
     }
 
