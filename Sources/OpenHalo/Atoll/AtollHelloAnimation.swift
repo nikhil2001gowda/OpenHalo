@@ -102,3 +102,4 @@ public struct AtollHelloAnimation: View {
         }
     }
 }
+

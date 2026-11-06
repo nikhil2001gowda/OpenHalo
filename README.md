@@ -206,9 +206,29 @@ Please see our [Contributing Guide](CONTRIBUTING.md) for details on code style, 
 
 ---
 
+## 🙏 Acknowledgements & Upstream Credits
+
+OpenHalo stands proudly on the shoulders of the macOS open-source community. We extend our deepest gratitude to the original projects, authors, and designers whose code, UI/UX innovations, and engineering foundations made this project possible:
+
+- **[Glance](https://github.com/jonathan-kosgei/glance) by Jonathan Kosgei:**
+  The groundbreaking lock screen face recognition engine, on-device Vision/ArcFace embedding pipeline, multi-cue liveness detection suite (`DeviceBezelDetector`, `GeometryLiveness`, `GlareCueExtractor`), Touch ID gated Keychain session, zero-power suspension engine, and notch HUD scan overlays.
+- **[Atoll](https://github.com/Ebullioscopic/Atoll) by Ebullioscopic & Atoll Contributors:**
+  The fluid spring animation curves (`notchSpring`, `pillSpring`), tactile iOS volume capsule slider with drag swell & dynamic speaker glyph lighting, continuous smooth marquee text scroller, horizontal ruler timer picker with tick marks & inertia, circular activity ring gauges, pulsating recording/mic indicator, color-coded gradient progress bars, and cursive neon hello animation.
+- **[Boring Notch](https://github.com/vashisthakshay/boring.notch) by Akshay Vashistha & Harsh Vashistha:**
+  The pioneer in open-source Dynamic Island implementations for macOS that proved what was possible.
+- **Commercial UI/UX Inspirations:**
+  - **[MediaMate](https://wouter01.github.io/MediaMate/) by Wouter de Bres:** The original gold standard for notch-anchored iOS volume and brightness HUD replacements.
+  - **[Droppy](https://droppy.app) & [NotchNook](https://lo-score.com/notchnook):** Temporary drag-and-drop file shelf, quick action menus, and clipboard history popovers.
+  - **[Alcove](https://tryalcove.com):** Focus goal ticker in notch wings and daily sprint checklist.
+  - **[Apple Dynamic Island](https://developer.apple.com/design/human-interface-guidelines/live-activities):** Apple's iconic iPhone Dynamic Island design language and Live Activity paradigms.
+
+*For full details on individual component mappings, copyright notices, and license compliance, please see [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).*
+
+---
+
 ## 📄 License
 
-OpenHalo is released under the **MIT License**. See [LICENSE](LICENSE) for full details.
+OpenHalo is released under the **MIT License**. Components adapted from upstream open-source projects ([Glance](https://github.com/jonathan-kosgei/glance) and [Atoll](https://github.com/Ebullioscopic/Atoll)) retain their original copyright notices and GNU GPLv3 headers in their respective subdirectories. See [LICENSE](LICENSE) and [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md) for details.
 
 ---
 

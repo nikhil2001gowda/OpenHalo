@@ -102,3 +102,4 @@ public struct AtollCircularGaugeView: View {
         .cornerRadius(10)
     }
 }
+

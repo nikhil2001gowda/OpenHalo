@@ -110,3 +110,4 @@ public struct AtollVolumeCapsuleSlider: View {
         value = min(max(Double(x / width), 0), 1)
     }
 }
+

@@ -67,3 +67,4 @@ public struct AtollColorCodedProgressBar: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: value)
     }
 }
+

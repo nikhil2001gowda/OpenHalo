@@ -52,3 +52,4 @@ public struct AtollRecordingIndicator: View {
         .animation(.easeInOut(duration: 0.25), value: isActive)
     }
 }
+

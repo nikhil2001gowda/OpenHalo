@@ -31,3 +31,4 @@ public struct AtollAnimations {
         .spring(response: 0.26, dampingFraction: 0.82)
     }
 }
+
