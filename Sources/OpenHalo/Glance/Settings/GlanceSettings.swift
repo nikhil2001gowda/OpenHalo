@@ -294,8 +294,8 @@ final class GlanceSettings {
         // catches the main attack (a photo on a phone screen).
         livenessMode = defaults.string(forKey: Key.livenessMode)
             .flatMap(LivenessMode.init(rawValue:)) ?? .light
-        // Matches `DetectionDistanceLevel.standard` — see RecognitionSettingsPage.swift.
-        minimumFaceWidth = defaults.object(forKey: Key.minimumFaceWidth) as? Float ?? 0.21
+        // Matches `DetectionDistanceLevel.standard` — supports natural desk viewing distance
+        minimumFaceWidth = defaults.object(forKey: Key.minimumFaceWidth) as? Float ?? 0.10
 
         // Resolve the stored style first, `.none` included, then split it
         // into the pick + the on/off flag the UI now works in.
@@ -352,5 +352,12 @@ final class GlanceSettings {
         // Push into the nonisolated mirror immediately, or FaceRecognitionPipeline
         // would keep its own default until the slider is first touched.
         FaceRecognitionPipeline.minimumProminentFaceWidth = minimumFaceWidth
+    }
+
+    public func resetToRecommendedDefaults() {
+        matchThreshold = 0.68
+        minimumFaceWidth = 0.10
+        livenessChecksEnabled = true
+        livenessMode = .light
     }
 }

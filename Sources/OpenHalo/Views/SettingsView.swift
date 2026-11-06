@@ -372,7 +372,7 @@ public struct SettingsView: View {
                             get: { Double(glanceSettings.minimumFaceWidth) },
                             set: { glanceSettings.minimumFaceWidth = Float($0) }
                         ),
-                        in: 0.08...0.25
+                        in: 0.06...0.25
                     )
 
                     HStack {
@@ -478,21 +478,34 @@ public struct SettingsView: View {
                     }
                 }
 
-                // Test Animation Button
-                Button(action: {
-                    coordinator.showFaceIDScan(isScanning: true, isUnlocked: false)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                        SoundEffectManager.playActionBeep()
-                        coordinator.showFaceIDScan(isScanning: false, isUnlocked: true)
+                // Test Animation & Recommended Reset Buttons
+                HStack(spacing: 12) {
+                    Button(action: {
+                        coordinator.showFaceIDScan(isScanning: true, isUnlocked: false)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                            SoundEffectManager.playActionBeep()
+                            coordinator.showFaceIDScan(isScanning: false, isUnlocked: true)
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "faceid")
+                            Text("Test Face ID HUD")
+                        }
                     }
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "faceid")
-                        Text("Test Face ID Notch HUD & Animation")
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Button(action: {
+                        glanceSettings.resetToRecommendedDefaults()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("Reset Recommended (68% / 10% Width)")
+                        }
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
                 .padding(.top, 4)
             }
             .padding(10)

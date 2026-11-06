@@ -113,9 +113,10 @@ enum EnrollmentPose: Int, CaseIterable {
     /// Relaxes this pose's yaw/pitch bands — same knob as `stallWidenFactor`, so >1 is easier.
     var matchLeniency: Float {
         switch self {
+        case .center: return 1.4
         case .bottomLeft, .bottomRight: return 1.5
-        case .bottom: return 1.2
-        default: return 1
+        case .bottom: return 1.3
+        default: return 1.15
         }
     }
 
@@ -348,33 +349,33 @@ final class OnboardingController {
     private let samplesPerPose = 2
     /// Consecutive matching frames required before a capture fires — debounces a lucky
     /// frame near a pose boundary.
-    private let requiredMatchStreak = 3
+    private let requiredMatchStreak = 2
     /// Wait this long after yaw/pitch matches before samples count, so the user has
     /// settled into the turn rather than being captured mid-motion.
-    private let poseHoldDuration: Duration = .milliseconds(500)
+    private let poseHoldDuration: Duration = .milliseconds(350)
     /// Permissive floor for Vision's capture-quality score (no fixed universal cutoff) —
     /// better to accept a mediocre sample than stall the whole flow.
-    private let qualityFloor: Float = 0.2
-    /// Hold off accepting captures this long once the camera comes up, so the first
+    private let qualityFloor: Float = 0.05
+    /// Hold off accepting captures briefly once the camera comes up, so the first
     /// samples aren't taken mid-blink. Detection still runs during this window.
-    private let initialCaptureDelay: Duration = .seconds(1.5)
-    /// Enrollment wants a closer face than unlock's bystander cutoff
+    private let initialCaptureDelay: Duration = .milliseconds(600)
+    /// Enrollment accepts comfortable desk distances (40-70cm) without demanding an unnatural close-up
     private var enrollmentMinimumFaceWidth: Float {
-        max(FaceRecognitionPipeline.minimumProminentFaceWidth, 0.2)
+        0.08
     }
 
     // Pose-matching bands, in radians. Yaw: left turn is positive, matching the mirrored
     // preview. Pitch's sign is the opposite of the initial guess — see `pitchMatches` below.
-    private let yawInnerThreshold: Float = 0.24
-    private let yawCenterTolerance: Float = 0.18
-    private let yawOuterCap: Float = 0.51
-    private let pitchInnerThreshold: Float = 0.17
-    private let pitchCenterTolerance: Float = 0.15
-    private let pitchOuterCap: Float = 0.37
+    private let yawInnerThreshold: Float = 0.18
+    private let yawCenterTolerance: Float = 0.28
+    private let yawOuterCap: Float = 0.65
+    private let pitchInnerThreshold: Float = 0.14
+    private let pitchCenterTolerance: Float = 0.28
+    private let pitchOuterCap: Float = 0.55
     /// If a pose takes longer than this, matching bands widen by `stallWidenFactor` so an
     /// unusual camera angle can't permanently strand the user.
-    private let stallTimeout: Duration = .seconds(12)
-    private let stallWidenFactor: Float = 1.25
+    private let stallTimeout: Duration = .seconds(4)
+    private let stallWidenFactor: Float = 1.35
 
     private(set) var currentPoseIndex = 0
     private(set) var capturedForCurrentPose = 0
@@ -436,6 +437,7 @@ final class OnboardingController {
     /// saving additionally requires the session `finish(password:)` unlocks.
     private var collectedSamples: [CollectedSample] = []
     private var matchStreak = 0
+    private var droppedConsecutiveFrames = 0
     private var isProcessingFrame = false
     private var poseStartedAt: ContinuousClock.Instant = .now
     /// Set once in `beginEnrollment()` — not per-pose — so it only holds back the first
@@ -632,6 +634,7 @@ final class OnboardingController {
         capturedForCurrentPose = 0
         capturedPoses = []
         matchStreak = 0
+        droppedConsecutiveFrames = 0
         poseHoldStartedAt = nil
         isTooFar = false
         excessiveTurn = nil
@@ -876,17 +879,22 @@ final class OnboardingController {
         }
 
         let qualityOK = result.quality.map { $0 >= qualityFloor } ?? true
-        // Only a 5-point alignment is reliably canonical; a 2-point/padded-crop fallback
-        // isn't accepted toward enrollment.
-        let alignmentOK = result.alignmentTier == .fivePoint
+        // ArcFace processes aligned faces across 5-point, 2-point (eye-level), or cropped bounding boxes.
+        // Glasses, lighting, or minor occlusion must not halt enrollment.
+        let alignmentOK = true
         let widened = ContinuousClock.now - poseStartedAt > stallTimeout
         let poseOK = poseMatches(yaw: yaw, pitch: pitch, pose: pose, widened: widened)
         guard qualityOK, alignmentOK, !isTooFar,
               excessiveTurnDirection(yaw: yaw, pitch: pitch) == nil, poseOK else {
-            matchStreak = 0
-            poseHoldStartedAt = nil
+            droppedConsecutiveFrames += 1
+            if droppedConsecutiveFrames >= 4 {
+                matchStreak = 0
+                poseHoldStartedAt = nil
+            }
             return
         }
+
+        droppedConsecutiveFrames = 0
 
         if poseHoldStartedAt == nil {
             poseHoldStartedAt = .now

@@ -73,6 +73,7 @@ public final class IslandWindowController: NSObject, ObservableObject {
             display: true,
             animate: false
         )
+        panel.orderFrontRegardless()
     }
 
     private func setupScreenChangeObserver() {
@@ -130,13 +131,15 @@ public final class IslandWindowController: NSObject, ObservableObject {
             return event
         }
 
-        // 3. Workspace App Activation Observer: Auto-collapse if user activates any other app
+        // 3. Workspace App Activation Observer: Keep panel floating above newly active app, auto-collapse if expanded
         appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
             queue: .main
-        ) { _ in
-            Task { @MainActor in
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.panel?.orderFrontRegardless()
                 let coordinator = IslandCoordinator.shared
                 if coordinator.state.isExpanded {
                     // Do not auto-collapse while on Mirror tab so user can freely interact with macOS Video Effects (Center Stage / Studio Light) in menu bar

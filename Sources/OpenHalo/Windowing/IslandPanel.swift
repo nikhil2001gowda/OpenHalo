@@ -5,7 +5,7 @@ public final class IslandPanel: NSPanel {
     /// Above regular, menu-bar, screen-saver, and assistive overlays. The
     /// shielding level is the highest public Core Graphics window tier.
     public static let overlayWindowLevel = NSWindow.Level(
-        rawValue: Int(CGShieldingWindowLevel()) + 1
+        rawValue: Int(CGShieldingWindowLevel()) + 2
     )
 
     public init(contentRect: NSRect) {
@@ -16,7 +16,8 @@ public final class IslandPanel: NSPanel {
             defer: false
         )
 
-        self.isFloatingPanel = true
+        // isFloatingPanel = false prevents AppKit from demoting the window level when other applications activate
+        self.isFloatingPanel = false
         self.level = Self.overlayWindowLevel
         self.collectionBehavior = [
             .canJoinAllSpaces,
