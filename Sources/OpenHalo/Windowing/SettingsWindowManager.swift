@@ -12,12 +12,17 @@ public final class SettingsWindowManager {
         if window == nil {
             let hosting = NSHostingView(rootView: SettingsView())
             let win = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 480, height: 560),
-                styleMask: [.titled, .closable, .miniaturizable],
+                contentRect: NSRect(x: 0, y: 0, width: 840, height: 600),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
             win.title = "OpenHalo Settings"
+            win.minSize = NSSize(width: 760, height: 520)
+            win.titlebarAppearsTransparent = true
+            win.titleVisibility = .hidden
+            win.toolbarStyle = .unified
+            win.isMovableByWindowBackground = true
             win.contentView = hosting
             win.center()
             win.isReleasedWhenClosed = false
