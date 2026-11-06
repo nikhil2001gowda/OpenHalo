@@ -90,4 +90,25 @@ public final class IslandPanel: NSPanel, NSDraggingDestination {
     public override var canBecomeMain: Bool {
         false
     }
+
+    public override func scrollWheel(with event: NSEvent) {
+        if event.deltaY < -1.5 {
+            // Swipe / scroll down opens the shelf
+            Task { @MainActor in
+                let coordinator = IslandCoordinator.shared
+                if !coordinator.state.isExpanded {
+                    coordinator.expandTo(tab: coordinator.activeTab)
+                }
+            }
+        } else if event.deltaY > 2.0 {
+            // Swipe / scroll up collapses the shelf
+            Task { @MainActor in
+                let coordinator = IslandCoordinator.shared
+                if coordinator.state.isExpanded {
+                    coordinator.collapseToCompact()
+                }
+            }
+        }
+        super.scrollWheel(with: event)
+    }
 }
