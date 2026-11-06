@@ -407,6 +407,14 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
         FaceEnrollmentStore.shared.deleteAll()
     }
 
+    public func saveEnrolledSignature(_ embedding: [Float]) {
+        self.enrolledEmbedding = embedding
+        UserDefaults.standard.set(embedding, forKey: self.enrollmentKey)
+        self.hasEnrolledFace = true
+        self.statusMessage = "Face Profile Enrolled (Glance Guided Engine)"
+        SoundEffectManager.playActionBeep()
+    }
+
     public func enrollCurrentFace() {
         launchGlanceGuidedNotchSweep()
     }

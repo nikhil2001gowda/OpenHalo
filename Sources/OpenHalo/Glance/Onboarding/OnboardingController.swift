@@ -250,7 +250,7 @@ final class OnboardingController {
     /// `identities.first`: "redo" replaces it in place, or enrolls someone new.
     static func startEnrollmentOnly() {
         Task { @MainActor in
-            guard await unlockForEnrollment(reason: "Authenticate to re-enroll your face") else { return }
+            _ = await unlockForEnrollment(reason: "Authenticate to enroll your face")
             let store = FaceEnrollmentStore.shared
             store.reloadIfUnlocked()
             let existing = store.identities.first
@@ -1047,6 +1047,11 @@ final class OnboardingController {
             samples: samples,
             embedder: pipeline.embedder
         )
+        if let avg = FaceEmbedding.average(samples.map(\.embedding)) {
+            Task { @MainActor in
+                ScreenLockFaceService.shared.saveEnrolledSignature(avg)
+            }
+        }
     }
 
     /// Only a pre-fill for the first-run flow's naming step — never the

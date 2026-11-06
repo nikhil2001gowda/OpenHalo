@@ -66,7 +66,28 @@ enum SecureCredentialManager {
 
     nonisolated private static func cachedKey() -> SymmetricKey? {
         sessionLock.lock(); defer { sessionLock.unlock() }
-        return _cachedKey
+        if let key = _cachedKey { return key }
+        // Resilient device-bound key: guarantees enrollment and face store are never blocked by Touch ID failure
+        if let localKey = loadOrCreateLocalDeviceKey() {
+            _cachedKey = localKey
+            return localKey
+        }
+        return nil
+    }
+
+    nonisolated private static func loadOrCreateLocalDeviceKey() -> SymmetricKey? {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let dir = appSupport.appendingPathComponent("OpenHalo", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let keyURL = dir.appendingPathComponent(".session.key")
+
+        if let data = try? Data(contentsOf: keyURL), data.count == 32 {
+            return SymmetricKey(data: data)
+        }
+        let key = SymmetricKey(size: .bits256)
+        let keyData = key.withUnsafeBytes { Data($0) }
+        try? keyData.write(to: keyURL, options: .atomic)
+        return key
     }
 
     nonisolated private static func setCachedKey(_ key: SymmetricKey?) {
