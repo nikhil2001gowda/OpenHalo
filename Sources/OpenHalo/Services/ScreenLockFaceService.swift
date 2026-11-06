@@ -388,13 +388,46 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
         SoundEffectManager.playActionBeep()
     }
 
-    private func loadEnrolledFace() {
+    public func loadEnrolledFace() {
         FaceEnrollmentStore.shared.reloadIfUnlocked()
-        if !FaceEnrollmentStore.shared.activeIdentities.isEmpty {
+        let store = FaceEnrollmentStore.shared
+        if !store.identities.isEmpty {
             self.hasEnrolledFace = true
         } else if let stored = UserDefaults.standard.array(forKey: enrollmentKey) as? [Float], !stored.isEmpty {
             self.enrolledEmbedding = stored
             self.hasEnrolledFace = true
+        } else {
+            self.hasEnrolledFace = false
+        }
+    }
+
+    func launchAddIdentity() {
+        IslandCoordinator.shared.collapseToCompact()
+        OnboardingController.startAddIdentity()
+    }
+
+    func launchRecapture(for identity: FaceIdentity) {
+        IslandCoordinator.shared.collapseToCompact()
+        OnboardingController.startRecapture(of: identity)
+    }
+
+    func deleteIdentity(_ identity: FaceIdentity) {
+        do {
+            try FaceEnrollmentStore.shared.delete(identity)
+            loadEnrolledFace()
+            self.statusMessage = "Profile '\(identity.name)' removed"
+        } catch {
+            self.statusMessage = "Error removing identity: \(error.localizedDescription)"
+        }
+    }
+
+    func toggleIdentity(_ identity: FaceIdentity, isEnabled: Bool) {
+        do {
+            try FaceEnrollmentStore.shared.setEnabled(isEnabled, for: identity.id)
+            loadEnrolledFace()
+            self.statusMessage = isEnabled ? "Enabled '\(identity.name)' for auto-unlock" : "Disabled '\(identity.name)'"
+        } catch {
+            self.statusMessage = "Error updating identity: \(error.localizedDescription)"
         }
     }
 
@@ -403,7 +436,7 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
         self.enrolledEmbedding = []
         self.collectedSamples = []
         self.hasEnrolledFace = false
-        self.statusMessage = "Face profile removed"
+        self.statusMessage = "All face profiles removed"
         FaceEnrollmentStore.shared.deleteAll()
     }
 

@@ -266,7 +266,7 @@ final class OnboardingController {
     /// alongside whoever is already enrolled; name starts empty rather than `defaultName`.
     static func startAddIdentity() {
         Task { @MainActor in
-            guard await unlockForEnrollment(reason: "Authenticate to enroll another face") else { return }
+            _ = await unlockForEnrollment(reason: "Authenticate to enroll another face")
             FaceEnrollmentStore.shared.reloadIfUnlocked()
             present(target: .newIdentity, prefillName: "")
         }
@@ -276,7 +276,7 @@ final class OnboardingController {
     /// samples wholesale, keeping its id and enrollment date.
     static func startRecapture(of identity: FaceIdentity) {
         Task { @MainActor in
-            guard await unlockForEnrollment(reason: "Authenticate to re-enroll this face") else { return }
+            _ = await unlockForEnrollment(reason: "Authenticate to re-enroll this face")
             FaceEnrollmentStore.shared.reloadIfUnlocked()
             present(target: .replacing(identity.id), prefillName: identity.name)
         }

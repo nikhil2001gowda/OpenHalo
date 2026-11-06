@@ -55,7 +55,12 @@ enum SecureCredentialManager {
 
     nonisolated static var isSessionUnlocked: Bool {
         sessionLock.lock(); defer { sessionLock.unlock() }
-        return _cachedKey != nil || KeychainHelper.hasPassword()
+        if _cachedKey != nil { return true }
+        if let localKey = loadOrCreateLocalDeviceKey() {
+            _cachedKey = localKey
+            return true
+        }
+        return KeychainHelper.hasPassword()
     }
 
     /// `nil` whenever the session is locked — there is no activity to age.

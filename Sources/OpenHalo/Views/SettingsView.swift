@@ -9,6 +9,7 @@ public struct SettingsView: View {
     @ObservedObject var weatherService = WeatherService.shared
 
     @State private var glanceSettings = GlanceSettings.shared
+    @State private var enrollmentStore = FaceEnrollmentStore.shared
     @State private var macPassword: String = ""
     @State private var hasStoredPassword: Bool = KeychainHelper.hasPassword()
     @State private var passwordStatusMessage: String? = nil
@@ -38,6 +39,10 @@ public struct SettingsView: View {
             .padding(20)
         }
         .frame(width: 580, height: 650)
+        .onAppear {
+            FaceEnrollmentStore.shared.reloadIfUnlocked()
+            faceService.loadEnrolledFace()
+        }
     }
 
     // MARK: - Subsections
@@ -180,36 +185,8 @@ public struct SettingsView: View {
             .background(Color.white.opacity(0.04))
             .cornerRadius(6)
 
-            HStack(spacing: 12) {
-                Button(action: {
-                    faceService.launchGlanceGuidedNotchSweep()
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "faceid")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text(faceService.hasEnrolledFace ? "Re-Enroll Face Profile (Guided Notch)" : "Enroll Face Profile (Guided Notch)")
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-
-                if faceService.hasEnrolledFace {
-                    Button("Clear Profile") {
-                        faceService.clearEnrolledFace()
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-
-                    Text("Status: Enrolled (Glance 9-Pose Store)")
-                        .font(.system(size: 10))
-                        .foregroundColor(.green)
-                } else {
-                    Text("Authentic Glance Guided Notch Window • 9 Poses")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                }
-            }
+            // Enrolled Face Profiles (Multi-User Face ID)
+            enrolledFacesSection
 
             // Keychain password box
             keychainPasswordBox
@@ -231,6 +208,134 @@ public struct SettingsView: View {
         } message: {
             Text(faceService.permissionErrorMessage ?? "Please ensure all mandatory permissions are granted before enabling Face ID.")
         }
+    }
+
+    private var enrolledFacesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Enrolled Face Profiles (\(enrollmentStore.identities.count))")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Button(action: {
+                    faceService.launchAddIdentity()
+                }) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 11))
+                        Text("Add Face...")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+
+            if enrollmentStore.identities.isEmpty {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.crop.circle.dashed")
+                        .font(.system(size: 22))
+                        .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("No face profiles enrolled yet")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white)
+                        Text("Enroll your face or family members' faces with Glance guided 9-pose notch scanning.")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Button("Enroll First Face") {
+                        faceService.launchGlanceGuidedNotchSweep()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+                .padding(10)
+                .background(Color.white.opacity(0.03))
+                .cornerRadius(6)
+            } else {
+                VStack(spacing: 6) {
+                    ForEach(enrollmentStore.identities) { identity in
+                        HStack(spacing: 10) {
+                            Image(systemName: identity.isEnabled ? "person.crop.circle.fill" : "person.crop.circle")
+                                .font(.system(size: 18))
+                                .foregroundColor(identity.isEnabled ? .cyan : .secondary)
+
+                            VStack(alignment: .leading, spacing: 1) {
+                                HStack(spacing: 6) {
+                                    Text(identity.name)
+                                        .font(.system(size: 11.5, weight: .semibold))
+                                        .foregroundColor(identity.isEnabled ? .white : .secondary)
+                                    if !identity.isEnabled {
+                                        Text("(Disabled)")
+                                            .font(.system(size: 9))
+                                            .foregroundColor(.orange)
+                                    }
+                                }
+                                Text("\(identity.samples.count) poses • Added \(identity.createdAt.formatted(date: .abbreviated, time: .omitted))")
+                                    .font(.system(size: 9.5))
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            Toggle("", isOn: Binding(
+                                get: { identity.isEnabled },
+                                set: { faceService.toggleIdentity(identity, isEnabled: $0) }
+                            ))
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                            .controlSize(.mini)
+                            .help("Enable or disable this face profile for auto-unlock")
+
+                            Button(action: {
+                                faceService.launchRecapture(for: identity)
+                            }) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .font(.system(size: 10))
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .help("Recapture 9-pose samples for \(identity.name)")
+
+                            Button(action: {
+                                faceService.deleteIdentity(identity)
+                            }) {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.red.opacity(0.8))
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .help("Remove \(identity.name)'s profile")
+                        }
+                        .padding(8)
+                        .background(Color.white.opacity(0.03))
+                        .cornerRadius(6)
+                    }
+                }
+
+                HStack {
+                    Text("• Multiple faces unlock the Mac in parallel against all active profiles.")
+                        .font(.system(size: 9.5))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Button("Clear All Profiles") {
+                        faceService.clearEnrolledFace()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .foregroundColor(.red.opacity(0.8))
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(8)
+        .background(Color.white.opacity(0.02))
+        .cornerRadius(6)
     }
 
     private var keychainPasswordBox: some View {
