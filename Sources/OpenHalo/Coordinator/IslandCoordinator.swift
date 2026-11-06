@@ -200,6 +200,7 @@ public final class IslandCoordinator: ObservableObject {
         withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
             self.state = .hud(payload)
         }
+        IslandWindowController.shared.panel?.orderFrontRegardless()
 
         let item = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
@@ -275,6 +276,7 @@ public final class IslandCoordinator: ObservableObject {
         withAnimation(AtollAnimations.notchSpring) {
             self.state = .expanded(tab)
         }
+        IslandWindowController.shared.panel?.orderFrontRegardless()
 
         // Start hardware polling when expanded on system tab
         if tab == .system {
@@ -300,6 +302,7 @@ public final class IslandCoordinator: ObservableObject {
         withAnimation(AtollAnimations.pillSpring) {
             self.state = .compact
         }
+        IslandWindowController.shared.panel?.orderFrontRegardless()
     }
 
     public func toggleExpanded() {

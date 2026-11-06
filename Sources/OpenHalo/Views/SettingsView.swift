@@ -394,6 +394,10 @@ public struct SettingsView: View {
                 }
             }
 
+            Text("Important: When macOS displays the Keychain security dialog, choose 'Always Allow' so OpenHalo can unlock your Mac smoothly without hanging at the lock screen.")
+                .font(.system(size: 9.5))
+                .foregroundColor(Color.white.opacity(0.6))
+
             // Accessibility Status
             HStack(spacing: 8) {
                 Circle()

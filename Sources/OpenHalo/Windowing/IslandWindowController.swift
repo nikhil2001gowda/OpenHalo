@@ -8,9 +8,11 @@ public final class IslandWindowController: NSObject, ObservableObject {
 
     public private(set) var panel: IslandPanel?
     private var screenChangeObserver: Any?
+    private var spaceChangeObserver: Any?
     private var clickOutsideGlobalMonitor: Any?
     private var clickOutsideLocalMonitor: Any?
     private var appActivationObserver: Any?
+    private var orderFrontTimer: Timer?
 
     public override init() {
         super.init()
@@ -22,6 +24,9 @@ public final class IslandWindowController: NSObject, ObservableObject {
         if let observer = screenChangeObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        if let observer = spaceChangeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
         if let monitor = clickOutsideGlobalMonitor {
             NSEvent.removeMonitor(monitor)
         }
@@ -31,6 +36,7 @@ public final class IslandWindowController: NSObject, ObservableObject {
         if let observer = appActivationObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
+        orderFrontTimer?.invalidate()
     }
 
     public func showIsland(with rootView: AnyView) {
@@ -146,6 +152,24 @@ public final class IslandWindowController: NSObject, ObservableObject {
                     if coordinator.activeTab == .mirror { return }
                     coordinator.collapseToCompact()
                 }
+            }
+        }
+
+        // 4. Space Change Observer: Stay on top when user switches virtual desktops / full-screen spaces
+        spaceChangeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.panel?.orderFrontRegardless()
+            }
+        }
+
+        // 5. Watchdog Periodic Re-assert: Ensure no app or full-screen window ever occludes the Dynamic Island
+        orderFrontTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.panel?.orderFrontRegardless()
             }
         }
     }

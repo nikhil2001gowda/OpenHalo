@@ -5,7 +5,7 @@ public final class IslandPanel: NSPanel {
     /// Above regular, menu-bar, screen-saver, and assistive overlays. The
     /// shielding level is the highest public Core Graphics window tier.
     public static let overlayWindowLevel = NSWindow.Level(
-        rawValue: Int(CGShieldingWindowLevel()) + 2
+        rawValue: Int(CGShieldingWindowLevel()) + 1
     )
 
     public init(contentRect: NSRect) {
@@ -30,6 +30,8 @@ public final class IslandPanel: NSPanel {
         self.hasShadow = false
         self.isMovable = false
         self.hidesOnDeactivate = false
+        self.worksWhenModal = true
+        self.isReleasedWhenClosed = false
         self.acceptsMouseMovedEvents = true
         self.registerForDraggedTypes([.fileURL, .URL, .string])
     }
