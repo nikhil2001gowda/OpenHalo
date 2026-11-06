@@ -7,6 +7,7 @@
 
 import Vision
 import CoreGraphics
+import CoreImage
 
 struct DetectedFace {
     /// Pixel-space bounding box, top-left origin — ready to crop with.
@@ -32,11 +33,53 @@ struct DetectedFace {
 /// Pure, synchronous, CPU-bound work — `nonisolated` so it can run on a
 /// background task despite the project's default main-actor isolation.
 nonisolated enum FaceDetector {
+    private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+
     /// Runs face-rectangle, capture-quality, and landmarks detection on a single frame.
+    /// Incorporates low-light / dark-night adaptive enhancement if primary detection finds no candidate.
     static func detectFaces(in image: CGImage) throws -> [DetectedFace] {
+        let faces = try performDetection(on: image)
+        if !faces.isEmpty {
+            return faces
+        }
+
+        // Low-light / dark room retry: Enhance exposure and contrast using Core Image
+        if let enhanced = enhanceLowLight(image) {
+            let enhancedFaces = try performDetection(on: enhanced)
+            if !enhancedFaces.isEmpty {
+                return enhancedFaces
+            }
+        }
+
+        return []
+    }
+
+    private static func enhanceLowLight(_ image: CGImage) -> CGImage? {
+        let ciImage = CIImage(cgImage: image)
+
+        // 1. Exposure compensation (+1.6 EV)
+        guard let exposureFilter = CIFilter(name: "CIExposureAdjust") else { return nil }
+        exposureFilter.setValue(ciImage, forKey: kCIInputImageKey)
+        exposureFilter.setValue(1.6, forKey: kCIInputEVKey)
+        guard let exposed = exposureFilter.outputImage else { return nil }
+
+        // 2. Color controls (boost contrast and brightness slightly)
+        guard let colorFilter = CIFilter(name: "CIColorControls") else { return nil }
+        colorFilter.setValue(exposed, forKey: kCIInputImageKey)
+        colorFilter.setValue(1.25, forKey: kCIInputContrastKey)
+        colorFilter.setValue(0.12, forKey: kCIInputBrightnessKey)
+        guard let output = colorFilter.outputImage else { return nil }
+
+        return ciContext.createCGImage(output, from: output.extent)
+    }
+
+    private static func performDetection(on image: CGImage) throws -> [DetectedFace] {
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
 
         let rectanglesRequest = VNDetectFaceRectanglesRequest()
+        if #available(macOS 14.0, *) {
+            rectanglesRequest.revision = VNDetectFaceRectanglesRequestRevision3
+        }
         try handler.perform([rectanglesRequest])
         let faceObservations = rectanglesRequest.results ?? []
         guard !faceObservations.isEmpty else { return [] }

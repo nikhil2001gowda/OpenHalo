@@ -81,7 +81,9 @@ public final class IslandWindowController: NSObject, ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.reposition()
+            Task { @MainActor [weak self] in
+                self?.reposition()
+            }
         }
     }
 

@@ -90,7 +90,7 @@ final class FaceRecognitionPipeline {
     }
 
     /// Below this fraction of frame width, a face is treated as a bystander, not a candidate — shared with onboarding's "move closer" prompt. `nonisolated(unsafe)` because it's read from a background-task static func that can't touch GlanceSettings' MainActor-isolated storage.
-    nonisolated(unsafe) static var minimumProminentFaceWidth: Float = 0.18
+    nonisolated(unsafe) static var minimumProminentFaceWidth: Float = 0.12
 
     /// Max normalized-coordinate drift between frames still counted as "the same person".
     nonisolated private static let continuityDistanceTolerance: CGFloat = 0.3
@@ -98,7 +98,10 @@ final class FaceRecognitionPipeline {
     /// Picks the person actually at the camera, not a bystander: filters out faces below `minimumProminentFaceWidth`, then prefers continuity with `previousBoundingBox` over raw largest-by-area so two similarly-sized faces can't flip-flop the selection frame to frame and starve the liveness/wrong-face streaks of agreement.
     nonisolated static func selectDominantFace(in faces: [DetectedFace], preferNear previousBoundingBox: CGRect? = nil) -> DetectedFace? {
         let candidates = faces.filter { $0.normalizedBoundingBox.width >= CGFloat(minimumProminentFaceWidth) }
-        guard !candidates.isEmpty else { return nil }
+        if candidates.isEmpty {
+            // Far distance fallback: If candidate filter is too restrictive, pick the prominent largest face in frame
+            return largestFace(in: faces)
+        }
 
         if let previous = previousBoundingBox {
             let previousCenter = CGPoint(x: previous.midX, y: previous.midY)

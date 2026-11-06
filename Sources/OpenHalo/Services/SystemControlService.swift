@@ -15,6 +15,8 @@ public final class SystemControlService: ObservableObject {
     private var currentOutputDeviceID: AudioDeviceID = 0
     private var syncTimer: Timer?
     private var lastUserAdjustmentDate: Date = .distantPast
+    private var mediaKeyGlobalMonitor: Any?
+    private var mediaKeyLocalMonitor: Any?
 
     // Private DisplayServices Dynamic Function Pointers (macOS System Settings perceived brightness)
     private typealias GetBrightnessFunc = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
@@ -28,11 +30,14 @@ public final class SystemControlService: ObservableObject {
         fetchCurrentBrightness()
         setupDefaultDeviceListener()
         startHardwareVolumeListener()
+        setupMediaKeyMonitor()
         startPeriodicSync()
     }
 
     deinit {
         syncTimer?.invalidate()
+        if let m = mediaKeyGlobalMonitor { NSEvent.removeMonitor(m) }
+        if let m = mediaKeyLocalMonitor { NSEvent.removeMonitor(m) }
     }
 
     // MARK: - DisplayServices Initialization
@@ -66,21 +71,67 @@ public final class SystemControlService: ObservableObject {
         syncTimer = nil
     }
 
+    // MARK: - Hardware Media Keys (F1/F2 Brightness Keys)
+    
+    private func setupMediaKeyMonitor() {
+        mediaKeyGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .systemDefined) { [weak self] event in
+            self?.handleSystemDefinedMediaEvent(event)
+        }
+        mediaKeyLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: .systemDefined) { [weak self] event in
+            self?.handleSystemDefinedMediaEvent(event)
+            return event
+        }
+    }
+
+    private func handleSystemDefinedMediaEvent(_ event: NSEvent) {
+        // Subtype 8 = NX_SUBTYPE_AUX_CONTROL_BUTTONS (media / hardware brightness keys)
+        guard event.subtype.rawValue == 8 else { return }
+        let data = event.data1
+        let keyCode = Int((data & 0xFFFF0000) >> 16)
+        let keyFlags = data & 0x0000FFFF
+        let keyState = (keyFlags & 0xFF00) >> 8
+        let _ = (keyState == 0xA) // Key down event
+
+        // 2: NX_KEYTYPE_BRIGHTNESS_DOWN, 3: NX_KEYTYPE_BRIGHTNESS_UP
+        if keyCode == 2 || keyCode == 3 {
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.lastUserAdjustmentDate = Date()
+                // Fetch latest brightness after macOS updates DisplayServices
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    self.syncHardwareBrightness(isUserAction: true)
+                }
+            }
+        }
+    }
+
+    public func syncHardwareBrightness(isUserAction: Bool = false) {
+        guard let fn = getBrightnessPointer else { return }
+        var currentHardwareB: Float = 0.0
+        if fn(CGMainDisplayID(), &currentHardwareB) == 0 {
+            let clamped = max(0.0, min(1.0, currentHardwareB))
+            let hasChanged = abs(clamped - self.brightness) > 0.005
+
+            if hasChanged {
+                self.brightness = clamped
+            }
+
+            // CRITICAL: ONLY notify onBrightnessChanged (which displays the HUD toggle in Island)
+            // if this change was triggered by an explicit user action (e.g. F1/F2 key, or within 1.5s of user adjustment).
+            // Silent system True Tone / ambient light sensor adaptations are updated silently without popping up the Island!
+            let isRecentUserAction = isUserAction || (Date().timeIntervalSince(lastUserAdjustmentDate) < 1.5)
+            if isRecentUserAction && hasChanged {
+                self.onBrightnessChanged?(clamped)
+            }
+        }
+    }
+
     private func syncHardwareState() {
         // Debounce: If user is actively dragging the slider, do not overwrite mid-drag
         guard Date().timeIntervalSince(lastUserAdjustmentDate) > 1.2 else { return }
 
-        // 1. Sync Brightness
-        if let fn = getBrightnessPointer {
-            var currentHardwareB: Float = 0.0
-            if fn(CGMainDisplayID(), &currentHardwareB) == 0 {
-                let clamped = max(0.0, min(1.0, currentHardwareB))
-                if abs(clamped - self.brightness) > 0.02 {
-                    self.brightness = clamped
-                    self.onBrightnessChanged?(clamped)
-                }
-            }
-        }
+        // 1. Sync Brightness SILENTLY — do not trigger HUD on automatic ambient adaptation!
+        syncHardwareBrightness(isUserAction: false)
 
         // 2. Sync Volume
         let currentHardwareVol = getHardwareVolumeScalar()

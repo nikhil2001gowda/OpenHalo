@@ -182,6 +182,25 @@ struct OpenHaloVerifier {
         print("Current SMAppService status: \(loginService.status)")
         print("✅ Launch At Login Service initialized safely!")
 
-        print("🎉 All 15 OpenHalo 4.0 verification checks passed successfully!")
+        // 16. Test Auto-Brightness Isolation (No HUD on Ambient Adaptations)
+        print("Checking User-Controlled vs Automatic Brightness isolation...")
+        let systemControls = SystemControlService()
+        var hudTriggeredOnAmbient = false
+        systemControls.onBrightnessChanged = { _ in
+            hudTriggeredOnAmbient = true
+        }
+        // Background ambient adaptation (isUserAction: false)
+        systemControls.syncHardwareBrightness(isUserAction: false)
+        assert(!hudTriggeredOnAmbient, "Ambient auto-brightness change must NOT trigger onBrightnessChanged HUD")
+
+        var userActionTriggeredHUD = false
+        systemControls.onBrightnessChanged = { _ in
+            userActionTriggeredHUD = true
+        }
+        systemControls.setBrightness(0.75)
+        assert(userActionTriggeredHUD, "Explicit user brightness adjustment MUST trigger onBrightnessChanged")
+        print("✅ Auto-Brightness isolation passed (ambient sensor changes suppressed from HUD)!")
+
+        print("🎉 All 16 OpenHalo 4.0 verification checks passed successfully!")
     }
 }

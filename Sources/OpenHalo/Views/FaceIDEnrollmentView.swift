@@ -19,24 +19,24 @@ public struct FaceIDEnrollmentView: View {
             // Header
             VStack(spacing: 6) {
                 Image(systemName: "faceid")
-                    .font(.system(size: 28, weight: .semibold))
+                    .font(.system(size: 32, weight: .semibold))
                     .foregroundColor(faceService.isEnrollmentComplete ? .green : .cyan)
                     .padding(.top, 8)
 
-                Text(faceService.isEnrollmentComplete ? "Face ID is Ready" : "Face ID Enrollment")
+                Text(faceService.isEnrollmentComplete ? "Face ID is Ready" : "Glance 9-Pose Face Enrollment")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
 
                 Text(faceService.isEnrollmentComplete
-                     ? "Your face profile is securely registered on-device."
-                     : "Position your face within the frame and move your head slowly around the circle.")
+                     ? "Your 9-pose face profile is securely registered on-device."
+                     : "Position your face in the circle and complete the guided poses to capture multi-angle data.")
                     .font(.system(size: 11))
                     .foregroundColor(Color.white.opacity(0.6))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
             }
 
-            // Central Circular Scanner with 36 Radial Ticks
+            // Central Circular Scanner with 36 Radial Ticks & 9-Pose indicators
             ZStack {
                 // Outer 36-Tick Radial Face ID Ring
                 faceIDTickRing
@@ -58,13 +58,16 @@ public struct FaceIDEnrollmentView: View {
                             )
                     }
 
-                    // Face Detected Corner Guides (iPhone Style)
+                    // Face Detected Corner Guides & Holding Pose Ring
                     if faceService.detectedFaceInFrame && !faceService.isEnrollmentComplete {
                         Circle()
-                            .stroke(Color.cyan.opacity(0.6), lineWidth: 2)
+                            .stroke(
+                                faceService.isHoldingPose ? Color.green : Color.cyan.opacity(0.6),
+                                lineWidth: faceService.isHoldingPose ? 3 : 2
+                            )
                             .frame(width: 168, height: 168)
-                            .scaleEffect(1.02)
-                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: faceService.detectedFaceInFrame)
+                            .scaleEffect(faceService.isHoldingPose ? 1.03 : 1.0)
+                            .animation(.easeInOut(duration: 0.3), value: faceService.isHoldingPose)
                     }
 
                     // Success Checkmark Overlay
@@ -93,13 +96,13 @@ public struct FaceIDEnrollmentView: View {
             VStack(spacing: 6) {
                 Text(faceService.enrollmentGuidance)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(faceService.isEnrollmentComplete ? .green : .white)
+                    .foregroundColor(faceService.isEnrollmentComplete ? .green : (faceService.isHoldingPose ? .green : .white))
                     .animation(.spring(response: 0.25, dampingFraction: 0.8), value: faceService.enrollmentGuidance)
 
                 if !faceService.isEnrollmentComplete {
-                    Text("\(Int(faceService.enrollmentProgress * 100))% Scanned")
+                    Text("Pose \(min(faceService.currentPoseIndex + 1, 9)) of 9 • \(Int(faceService.enrollmentProgress * 100))% Scanned")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundColor(Color.white.opacity(0.5))
+                        .foregroundColor(Color.white.opacity(0.55))
 
                     // Progress Bar
                     GeometryReader { geo in
@@ -109,13 +112,42 @@ public struct FaceIDEnrollmentView: View {
                                 .frame(height: 4)
 
                             Capsule()
-                                .fill(Color.cyan)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.cyan, .green],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
                                 .frame(width: geo.size.width * CGFloat(faceService.enrollmentProgress), height: 4)
                                 .animation(.spring(response: 0.2, dampingFraction: 0.8), value: faceService.enrollmentProgress)
                         }
                     }
                     .frame(width: 160, height: 4)
                 }
+            }
+
+            // Launch Native Notch Sweep Option
+            if !faceService.isEnrollmentComplete {
+                Button(action: {
+                    faceService.stopInteractiveEnrollment()
+                    onDismiss()
+                    faceService.launchGlanceGuidedNotchSweep()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "macbook.and.iphone")
+                            .font(.system(size: 10))
+                        Text("Switch to Native Notch Drop Guided Sweep")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundColor(.cyan)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.cyan.opacity(0.10))
+                    .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
             }
 
             Spacer()
@@ -153,10 +185,10 @@ public struct FaceIDEnrollmentView: View {
                 }
             }
             .padding(.horizontal, 24)
-            .padding(.bottom, 12)
+            .padding(.bottom, 16)
         }
-        .frame(width: 320, height: 440)
-        .background(Color(red: 0.08, green: 0.08, blue: 0.1))
+        .frame(width: 320, height: 460)
+        .background(Color(red: 0.11, green: 0.11, blue: 0.12))
         .onAppear {
             faceService.startInteractiveEnrollment()
         }
@@ -165,21 +197,20 @@ public struct FaceIDEnrollmentView: View {
         }
     }
 
-    // MARK: - Radial Face ID 36-Tick Ring
+    // MARK: - 36-Tick Radial Face ID Ring
 
     private var faceIDTickRing: some View {
         ZStack {
-            ForEach(0..<36, id: \.self) { index in
-                let tickRatio = Double(index) / 36.0
-                let isScanned = faceService.isEnrollmentComplete || (tickRatio <= faceService.enrollmentProgress)
+            ForEach(0..<36) { index in
+                let angle = Double(index) * 10.0
+                let isLit = Double(index) / 36.0 <= faceService.enrollmentProgress
 
                 Rectangle()
-                    .fill(isScanned ? Color(red: 0.2, green: 0.85, blue: 0.35) : Color.white.opacity(0.15))
-                    .frame(width: 3, height: 12)
-                    .cornerRadius(1.5)
+                    .fill(isLit ? (faceService.isEnrollmentComplete ? Color.green : Color.cyan) : Color.white.opacity(0.15))
+                    .frame(width: isLit ? 2.5 : 1.8, height: isLit ? 10 : 7)
                     .offset(y: -102)
-                    .rotationEffect(.degrees(Double(index) * 10))
-                    .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isScanned)
+                    .rotationEffect(.degrees(angle))
+                    .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isLit)
             }
         }
     }

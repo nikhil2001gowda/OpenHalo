@@ -92,20 +92,20 @@ public final class IslandCoordinator: ObservableObject {
     public var currentIslandHeight: CGFloat {
         if isDropHovered { return 120 }
         let hasNotch = ScreenNotchDetector.detect().hasNotch
-        let notchHeight: CGFloat = hasNotch ? 44 : 0
+        let notchHeight: CGFloat = hasNotch ? 46 : 22
 
         if state.isExpanded {
             switch activeTab {
-            case .calendar: return 280 + notchHeight
-            case .mirror: return 235 + notchHeight
-            case .media: return 195 + notchHeight
-            case .timers: return 185 + notchHeight
-            case .system: return 205 + notchHeight
-            case .shelf: return 175 + notchHeight
-            case .clipboard: return 195 + notchHeight
-            case .launcher: return 175 + notchHeight
-            case .focus: return 175 + notchHeight
-            case .weather: return 205 + notchHeight
+            case .calendar: return 290 + notchHeight
+            case .mirror: return 245 + notchHeight
+            case .media: return 205 + notchHeight
+            case .timers: return 195 + notchHeight
+            case .system: return 220 + notchHeight
+            case .shelf: return 185 + notchHeight
+            case .clipboard: return 205 + notchHeight
+            case .launcher: return 185 + notchHeight
+            case .focus: return 185 + notchHeight
+            case .weather: return 215 + notchHeight
             }
         }
         if case .hud = state {

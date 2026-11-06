@@ -30,23 +30,34 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
     @Published public var lastRecognitionTimestamp: Date? = nil
     @Published public var statusMessage: String = "Idle"
 
-    // Interactive Enrollment Properties
+    // Interactive 9-Pose Enrollment Properties (Glance Engine)
     @Published public var isEnrolling: Bool = false
     @Published public var enrollmentProgress: Double = 0.0
     @Published public var enrollmentGuidance: String = "Position your face within the frame"
     @Published public var isEnrollmentComplete: Bool = false
     @Published public var detectedFaceInFrame: Bool = false
+    @Published public var isHoldingPose: Bool = false
     @Published public var activeSession: AVCaptureSession? = nil
+    @Published public var currentPoseIndex: Int = 0
 
     private let enrollmentKey = "OpenHalo.FaceID.EnrolledSignature.v2"
     public private(set) var enrolledEmbedding: [Float] = []
-    private var collectedEnrollmentEmbeddings: [[Float]] = []
+    private var collectedSamples: [FaceSample] = []
 
-    // Glance Camera & Processing
+    // Glance Camera & Recognition Pipeline
     private let cameraManager = CameraManager()
     private var framePollingTimer: Timer?
     private var isProcessingFrame = false
-    private let embedder = VisionFeaturePrintEmbedder()
+    private let pipeline = FaceRecognitionPipeline()
+
+    // 9 Guided Compass Poses (Glance Enrollment Engine)
+    let poses = EnrollmentPose.allCases
+    private let samplesPerPose = 2
+    private var capturedForCurrentPose = 0
+    private var matchStreak = 0
+    private let requiredMatchStreak = 3
+    private var poseHoldStartedAt: Date?
+    private let poseHoldDuration: TimeInterval = 0.50
 
     public override init() {
         super.init()
@@ -58,7 +69,9 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.checkAccessibilityPermission()
+            Task { @MainActor [weak self] in
+                self?.checkAccessibilityPermission()
+            }
         }
 
         // Keep Glance settings in sync
@@ -95,14 +108,23 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Glance Interactive Enrollment
+    // MARK: - Glance Canonical Guided 9-Pose Enrollment
+
+    public func launchGlanceGuidedNotchSweep() {
+        OnboardingController.startEnrollmentOnly()
+    }
 
     public func startInteractiveEnrollment() {
         self.isEnrolling = true
         self.isEnrollmentComplete = false
         self.enrollmentProgress = 0.0
-        self.enrollmentGuidance = "Position your face in the center"
-        self.collectedEnrollmentEmbeddings = []
+        self.currentPoseIndex = 0
+        self.capturedForCurrentPose = 0
+        self.matchStreak = 0
+        self.poseHoldStartedAt = nil
+        self.isHoldingPose = false
+        self.enrollmentGuidance = poses[0].instruction
+        self.collectedSamples = []
         self.detectedFaceInFrame = false
 
         Task {
@@ -118,6 +140,7 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
         self.framePollingTimer = nil
         self.cameraManager.stop()
         self.activeSession = nil
+        self.isHoldingPose = false
     }
 
     public func stopAndCleanup() {
@@ -139,95 +162,153 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
     }
 
     private func processCameraFrame(_ frame: CameraFrame) async {
+        guard isEnrolling && !isEnrollmentComplete else { return }
+
         do {
             let faces = try FaceDetector.detectFaces(in: frame.image)
-            guard let face = faces.first else {
-                if isEnrolling {
-                    self.detectedFaceInFrame = false
-                }
+            guard let face = FaceRecognitionPipeline.largestFace(in: faces) else {
+                self.detectedFaceInFrame = false
+                self.matchStreak = 0
+                self.poseHoldStartedAt = nil
+                self.isHoldingPose = false
                 return
             }
 
-            guard let crop = FaceDetector.crop(face, from: frame.image) else { return }
+            self.detectedFaceInFrame = true
 
-            if isEnrolling {
-                self.detectedFaceInFrame = true
-                let yaw = Double(face.yaw ?? 0)
-                let pitch = Double(face.pitch ?? 0)
-                await self.processEnrollmentStep(crop: crop, yaw: yaw, pitch: pitch)
+            // Far distance checking
+            if face.normalizedBoundingBox.width < CGFloat(FaceRecognitionPipeline.minimumProminentFaceWidth) {
+                self.enrollmentGuidance = "Bring your face closer to the camera"
+                self.matchStreak = 0
+                self.poseHoldStartedAt = nil
+                self.isHoldingPose = false
+                return
+            }
+
+            // Pose matching
+            guard currentPoseIndex < poses.count else { return }
+            let pose = poses[currentPoseIndex]
+            let yaw = face.yaw ?? 0
+            let pitch = face.pitch ?? 0
+
+            let isMatching = checkPoseMatch(pose: pose, yaw: yaw, pitch: pitch)
+
+            if isMatching {
+                matchStreak += 1
+                if matchStreak >= requiredMatchStreak {
+                    self.isHoldingPose = true
+                    if poseHoldStartedAt == nil {
+                        poseHoldStartedAt = Date()
+                    }
+
+                    if let started = poseHoldStartedAt, Date().timeIntervalSince(started) >= poseHoldDuration {
+                        // Capture valid frame sample
+                        if let result = try? pipeline.recognize(face, in: frame.image) {
+                            let sample = FaceSample(
+                                embedding: result.embedding,
+                                pose: pose.name,
+                                capturedAt: Date(),
+                                quality: result.quality ?? 0.85
+                            )
+                            collectedSamples.append(sample)
+                            capturedForCurrentPose += 1
+
+                            // Recalculate progress
+                            let totalSamples = Double(poses.count * samplesPerPose)
+                            let completed = Double(currentPoseIndex * samplesPerPose + capturedForCurrentPose)
+                            self.enrollmentProgress = min(completed / totalSamples, 1.0)
+
+                            // Check if current pose quota fulfilled
+                            if capturedForCurrentPose >= samplesPerPose {
+                                currentPoseIndex += 1
+                                capturedForCurrentPose = 0
+                                matchStreak = 0
+                                poseHoldStartedAt = nil
+                                self.isHoldingPose = false
+
+                                if currentPoseIndex < poses.count {
+                                    self.enrollmentGuidance = poses[currentPoseIndex].instruction
+                                } else {
+                                    finishEnrollment()
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                matchStreak = 0
+                poseHoldStartedAt = nil
+                self.isHoldingPose = false
+                self.enrollmentGuidance = pose.instruction
             }
         } catch {
             // Frame processing retry
         }
     }
 
-    private func processEnrollmentStep(crop: CGImage, yaw: Double, pitch: Double) async {
-        guard isEnrolling && !isEnrollmentComplete else { return }
+    private func checkPoseMatch(pose: EnrollmentPose, yaw: Float, pitch: Float) -> Bool {
+        let yawThresh: Float = 0.20
+        let pitchThresh: Float = 0.15
 
-        if let embedding = try? embedder.embedding(for: crop) {
-            collectedEnrollmentEmbeddings.append(embedding)
-        }
-
-        let current = enrollmentProgress
-
-        if current < 0.3 {
-            self.enrollmentGuidance = "Look directly at the camera"
-            if abs(yaw) < 0.25 {
-                enrollmentProgress = min(0.3, current + 0.05)
-            }
-        } else if current < 0.55 {
-            self.enrollmentGuidance = "Slowly turn your head to the left"
-            if yaw < -0.15 {
-                enrollmentProgress = min(0.55, current + 0.05)
-            } else {
-                enrollmentProgress = min(0.55, current + 0.02)
-            }
-        } else if current < 0.8 {
-            self.enrollmentGuidance = "Slowly turn your head to the right"
-            if yaw > 0.15 {
-                enrollmentProgress = min(0.8, current + 0.05)
-            } else {
-                enrollmentProgress = min(0.8, current + 0.02)
-            }
-        } else if current < 1.0 {
-            self.enrollmentGuidance = "Tilt your head slightly up and down"
-            if abs(pitch) > 0.08 {
-                enrollmentProgress = min(1.0, current + 0.05)
-            } else {
-                enrollmentProgress = min(1.0, current + 0.02)
-            }
-        }
-
-        if enrollmentProgress >= 1.0 {
-            finishEnrollment()
+        switch pose {
+        case .center:
+            return abs(yaw) < 0.18 && abs(pitch) < 0.14
+        case .left:
+            return yaw > yawThresh && abs(pitch) < 0.18
+        case .right:
+            return yaw < -yawThresh && abs(pitch) < 0.18
+        case .top:
+            return pitch < -pitchThresh && abs(yaw) < 0.20
+        case .bottom:
+            return pitch > pitchThresh && abs(yaw) < 0.20
+        case .topLeft:
+            return yaw > (yawThresh * 0.7) && pitch < -(pitchThresh * 0.7)
+        case .topRight:
+            return yaw < -(yawThresh * 0.7) && pitch < -(pitchThresh * 0.7)
+        case .bottomLeft:
+            return yaw > (yawThresh * 0.7) && pitch > (pitchThresh * 0.7)
+        case .bottomRight:
+            return yaw < -(yawThresh * 0.7) && pitch > (pitchThresh * 0.7)
         }
     }
 
     private func finishEnrollment() {
         self.isEnrollmentComplete = true
-        self.enrollmentGuidance = "Face ID is Ready!"
+        self.enrollmentGuidance = "Face ID Profile Ready!"
         stopInteractiveEnrollment()
 
-        if !collectedEnrollmentEmbeddings.isEmpty {
-            if let avg = FaceEmbedding.average(collectedEnrollmentEmbeddings) {
-                self.enrolledEmbedding = avg
-            }
-        } else {
-            self.enrolledEmbedding = []
+        // Extract embeddings
+        let embeddings = collectedSamples.map(\.embedding)
+        if let avg = FaceEmbedding.average(embeddings) {
+            self.enrolledEmbedding = avg
+        } else if let first = embeddings.first {
+            self.enrolledEmbedding = first
         }
 
         UserDefaults.standard.set(self.enrolledEmbedding, forKey: self.enrollmentKey)
         self.hasEnrolledFace = true
-        self.statusMessage = "Face Profile Enrolled (Glance Engine)"
+        self.statusMessage = "Face Profile Enrolled (Glance 9-Pose Engine)"
 
-        // Reload FaceEnrollmentStore so FaceUnlockCoordinator immediately uses it
-        FaceEnrollmentStore.shared.reloadIfUnlocked()
+        // Save into FaceEnrollmentStore so FaceUnlockCoordinator immediately uses it
+        let store = FaceEnrollmentStore.shared
+        store.reloadIfUnlocked()
+        if !store.isLocked {
+            _ = try? store.commitEnrollment(
+                replacing: nil,
+                name: NSFullUserName(),
+                samples: collectedSamples,
+                embedder: pipeline.embedder
+            )
+        }
 
         SoundEffectManager.playActionBeep()
     }
 
     private func loadEnrolledFace() {
-        if let stored = UserDefaults.standard.array(forKey: enrollmentKey) as? [Float], !stored.isEmpty {
+        FaceEnrollmentStore.shared.reloadIfUnlocked()
+        if !FaceEnrollmentStore.shared.activeIdentities.isEmpty {
+            self.hasEnrolledFace = true
+        } else if let stored = UserDefaults.standard.array(forKey: enrollmentKey) as? [Float], !stored.isEmpty {
             self.enrolledEmbedding = stored
             self.hasEnrolledFace = true
         }
@@ -236,6 +317,7 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
     public func clearEnrolledFace() {
         UserDefaults.standard.removeObject(forKey: enrollmentKey)
         self.enrolledEmbedding = []
+        self.collectedSamples = []
         self.hasEnrolledFace = false
         self.statusMessage = "Face profile removed"
         FaceEnrollmentStore.shared.deleteAll()

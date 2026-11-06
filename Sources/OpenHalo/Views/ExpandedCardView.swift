@@ -11,16 +11,23 @@ public struct ExpandedCardView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            if hasNotch {
-                // Subtle notch drop-down grabber accent right below the hardware camera housing
-                Capsule()
-                    .fill(Color.white.opacity(0.18))
-                    .frame(width: 32, height: 3.5)
-                    .padding(.top, 36)
+            // Dynamic Island top collar & drop-down accent
+            VStack(spacing: 2) {
+                if hasNotch {
+                    Color.clear
+                        .frame(height: 32)
+                } else {
+                    Color.clear
+                        .frame(height: 6)
+                }
+
+                Capsule(style: .continuous)
+                    .fill(Color.white.opacity(0.24))
+                    .frame(width: 36, height: 3.5)
                     .padding(.bottom, 2)
             }
 
-            // Adaptive Header Tab Strip (10 Feature Tabs)
+            // Adaptive Header Tab Strip (10 Feature Tabs) placed strictly below the physical notch
             HStack(spacing: 4) {
                 tabButton(.media, title: "Media", icon: "music.note")
                 tabButton(.calendar, title: "Calendar", icon: "calendar")
@@ -33,7 +40,7 @@ public struct ExpandedCardView: View {
                 tabButton(.shelf, title: "Shelf", icon: "tray.and.arrow.down.fill", badgeCount: coordinator.fileShelfService.items.count)
                 tabButton(.mirror, title: "Mirror", icon: "camera.fill")
 
-                Spacer()
+                Spacer(minLength: 4)
 
                 // Settings Button
                 Button(action: {
@@ -42,9 +49,12 @@ public struct ExpandedCardView: View {
                     Image(systemName: "gearshape.fill")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(Color.white.opacity(0.75))
-                        .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.12))
-                        .clipShape(Circle())
+                        .frame(width: 24, height: 24)
+                        .background(
+                            Circle()
+                                .fill(Color.white.opacity(0.10))
+                                .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+                        )
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -58,9 +68,12 @@ public struct ExpandedCardView: View {
                     Image(systemName: "chevron.up")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(Color.white.opacity(0.6))
-                        .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.12))
-                        .clipShape(Circle())
+                        .frame(width: 24, height: 24)
+                        .background(
+                            Circle()
+                                .fill(Color.white.opacity(0.10))
+                                .overlay(Circle().stroke(Color.white.opacity(0.12), lineWidth: 0.5))
+                        )
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -68,12 +81,13 @@ public struct ExpandedCardView: View {
                 .help("Collapse Island")
             }
             .padding(.horizontal, 12)
-            .padding(.top, hasNotch ? 4 : 10)
-            .padding(.bottom, 4)
+            .padding(.top, hasNotch ? 2 : 10)
+            .padding(.bottom, 6)
 
             Divider()
-                .background(Color.white.opacity(0.1))
-                .padding(.horizontal, 12)
+                .background(Color.white.opacity(0.08))
+                .padding(.horizontal, 14)
+                .padding(.bottom, 2)
 
             // Body Content based on activeTab
             tabContent
@@ -124,15 +138,18 @@ public struct ExpandedCardView: View {
         let isSelected = coordinator.activeTab == tab
 
         return Button(action: {
-            coordinator.expandTo(tab: tab)
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.8)) {
+                coordinator.expandTo(tab: tab)
+            }
         }) {
-            HStack(spacing: 3) {
+            HStack(spacing: 3.5) {
                 Image(systemName: icon)
-                    .font(.system(size: 9.5, weight: .semibold))
+                    .font(.system(size: 10, weight: isSelected ? .bold : .medium))
 
                 if isSelected {
                     Text(title)
-                        .font(.system(size: 9.5, weight: .medium))
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .transition(.scale(scale: 0.9).combined(with: .opacity))
                 }
 
                 if badgeCount > 0 && !isSelected {
@@ -142,14 +159,16 @@ public struct ExpandedCardView: View {
                 }
             }
             .foregroundColor(isSelected ? .white : Color.white.opacity(0.55))
-            .padding(.horizontal, isSelected ? 8 : 6)
-            .padding(.vertical, 4)
+            .padding(.horizontal, isSelected ? 8 : 6.5)
+            .padding(.vertical, 4.5)
             .background(
-                isSelected ?
-                    Color.white.opacity(0.2) :
-                    Color.white.opacity(0.04)
+                Capsule(style: .continuous)
+                    .fill(isSelected ? Color.white.opacity(0.20) : Color.white.opacity(0.04))
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(isSelected ? Color.white.opacity(0.22) : Color.clear, lineWidth: 0.5)
+                    )
             )
-            .cornerRadius(7)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

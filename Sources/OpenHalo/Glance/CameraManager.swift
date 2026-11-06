@@ -153,6 +153,12 @@ final class CameraManager: NSObject {
         do {
             try device.lockForConfiguration()
             device.activeFormat = best
+            if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+            }
+            if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                device.whiteBalanceMode = .continuousAutoWhiteBalance
+            }
             device.unlockForConfiguration()
         } catch {
             errorMessage = "Couldn't select the camera's highest-resolution format: \(error.localizedDescription)"
