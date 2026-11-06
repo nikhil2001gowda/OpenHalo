@@ -10,6 +10,16 @@ public final class PowerSuspensionCoordinator: ObservableObject {
     @Published public private(set) var sleepCount: Int = 0
     @Published public private(set) var wakeCount: Int = 0
 
+    public var sleepStateDescription: String {
+        if sleepCount == 0 {
+            return "Active (Armed & Ready)"
+        } else if sleepCount == 1 {
+            return "Active (1 sleep cycle preserved)"
+        } else {
+            return "Active (\(sleepCount) sleep cycles preserved)"
+        }
+    }
+
     private var observers: [NSObjectProtocol] = []
 
     public init() {

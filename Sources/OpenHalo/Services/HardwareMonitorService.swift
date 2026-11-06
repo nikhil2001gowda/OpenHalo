@@ -7,6 +7,8 @@ public final class HardwareMonitorService: ObservableObject {
     @Published public var memoryUsagePercent: Double = 0.0
     @Published public var usedMemoryGB: Double = 0.0
     @Published public var totalMemoryGB: Double = 0.0
+    @Published public var appCPUUsagePercent: Double = 0.0
+    @Published public var appThreadCount: Int = 0
 
     private var timer: Timer?
     private var previousCPULoad: host_cpu_load_info?
@@ -34,6 +36,38 @@ public final class HardwareMonitorService: ObservableObject {
     public func sampleMetrics() {
         updateCPUUsage()
         updateMemoryUsage()
+        updateAppCPUUsage()
+    }
+
+    private func updateAppCPUUsage() {
+        var threadsList: thread_act_array_t?
+        var threadsCount: mach_msg_type_number_t = 0
+        let kr = task_threads(mach_task_self_, &threadsList, &threadsCount)
+        guard kr == KERN_SUCCESS, let threadsList = threadsList else { return }
+
+        self.appThreadCount = Int(threadsCount)
+        var totalUsage: Double = 0.0
+
+        for i in 0..<Int(threadsCount) {
+            var threadInfo = thread_basic_info()
+            var threadInfoCount = mach_msg_type_number_t(THREAD_INFO_MAX)
+            let infoKr = withUnsafeMutablePointer(to: &threadInfo) { ptr in
+                ptr.withMemoryRebound(to: integer_t.self, capacity: Int(threadInfoCount)) { intPtr in
+                    thread_info(threadsList[i], thread_flavor_t(THREAD_BASIC_INFO), intPtr, &threadInfoCount)
+                }
+            }
+            if infoKr == KERN_SUCCESS {
+                if (threadInfo.flags & TH_FLAGS_IDLE) == 0 {
+                    totalUsage += (Double(threadInfo.cpu_usage) / Double(TH_USAGE_SCALE)) * 100.0
+                }
+            }
+        }
+        vm_deallocate(
+            mach_task_self_,
+            vm_address_t(UInt(bitPattern: threadsList)),
+            vm_size_t(threadsCount) * vm_size_t(MemoryLayout<thread_t>.stride)
+        )
+        self.appCPUUsagePercent = max(0.0, totalUsage)
     }
 
     private func updateCPUUsage() {

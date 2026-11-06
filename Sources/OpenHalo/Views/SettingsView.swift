@@ -97,6 +97,11 @@ public struct SettingsView: View {
         .onAppear {
             FaceEnrollmentStore.shared.reloadIfUnlocked()
             faceService.loadEnrolledFace()
+            coordinator.hardwareMonitor.startPolling(interval: 1.5)
+            coordinator.batteryService.updateBatteryState()
+        }
+        .onDisappear {
+            coordinator.hardwareMonitor.stopPolling()
         }
         .alert("Face ID Permission Required", isPresented: $faceService.isShowingPermissionAlert) {
             Button("OK", role: .cancel) {}
@@ -153,11 +158,16 @@ public struct SettingsView: View {
                     .fill(Color.green)
                     .frame(width: 7, height: 7)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Low-Power Engine: Active")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(.white)
-                    Text("0% Idle CPU • Sleep: \(powerCoordinator.sleepCount)")
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text("Low-Power Engine")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.white)
+                        Text("• Active")
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundColor(.green)
+                    }
+                    Text("\(String(format: "%.1f%%", coordinator.hardwareMonitor.appCPUUsagePercent)) CPU • \(coordinator.batteryService.consumptionRateBadgeText)")
                         .font(.system(size: 9))
                         .foregroundColor(.secondary)
                 }
@@ -272,7 +282,7 @@ public struct SettingsView: View {
                     ) {
                         HStack(spacing: 6) {
                             Circle().fill(Color.green).frame(width: 6, height: 6)
-                            Text("Active (\(powerCoordinator.sleepCount) sleep cycles)")
+                            Text(powerCoordinator.sleepStateDescription)
                                 .font(.system(size: 10.5, weight: .medium))
                                 .foregroundColor(.green)
                         }

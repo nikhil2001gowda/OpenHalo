@@ -363,7 +363,13 @@ public struct SystemHealthView: View {
                             .font(.system(size: 9))
                             .foregroundColor(.green)
                     }
-                    Text(batteryService.isCharging ? "Charging" : (batteryService.isPluggedIn ? "Power Adapter" : "On Battery"))
+                    Text(batteryService.isCharging 
+                         ? String(format: "Charging (+%.1fW)", batteryService.powerWatts)
+                         : (batteryService.isPluggedIn 
+                            ? "Power Adapter" 
+                            : (batteryService.powerWatts > 0.1 
+                               ? String(format: "On Battery (%.1fW)", batteryService.powerWatts) 
+                               : "On Battery")))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(Color.white.opacity(0.5))
                 }
@@ -396,8 +402,6 @@ public struct SystemHealthView: View {
     }
 
     private var batterySubtitle: String {
-        if batteryService.isCharging { return "Charging" }
-        if batteryService.isPluggedIn { return "Plugged In" }
-        return "Discharging"
+        return batteryService.consumptionRateText
     }
 }
