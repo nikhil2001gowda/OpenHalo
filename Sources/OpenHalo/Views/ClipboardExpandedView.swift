@@ -156,6 +156,19 @@ public struct ClipboardExpandedView: View {
                 .padding(.vertical, 2)
                 .background(Color.white.opacity(0.1))
                 .cornerRadius(4)
+            } else if item.type == .url, let domain = item.linkDomain {
+                HStack(spacing: 3) {
+                    Image(systemName: "link")
+                        .font(.system(size: 7, weight: .bold))
+                    Text(domain)
+                        .font(.system(size: 8.5, weight: .bold))
+                        .lineLimit(1)
+                }
+                .foregroundColor(.green)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(Color.green.opacity(0.15))
+                .cornerRadius(4)
             } else {
                 Text(item.type.rawValue)
                     .font(.system(size: 8.5, weight: .bold))
@@ -248,11 +261,29 @@ public struct ClipboardExpandedView: View {
         .onTapGesture {
             clipboardService.copyToClipboard(item)
         }
+        .contextMenu {
+            Button("Copy to Clipboard") {
+                clipboardService.copyToClipboard(item)
+            }
+            if item.type == .url, let url = URL(string: item.content) {
+                Button("Open Link in Browser") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            Button(item.isPinned ? "Unpin Item" : "Pin Item to Top") {
+                clipboardService.togglePin(id: item.id)
+            }
+            Divider()
+            Button("Delete Clipping") {
+                clipboardService.deleteItem(id: item.id)
+            }
+        }
     }
 
     private func iconForFilter(_ type: ClipboardItemType) -> String {
         switch type {
         case .all: return "square.grid.2x2"
+        case .pinned: return "pin.fill"
         case .image: return "photo.fill"
         case .text: return "text.alignleft"
         case .url: return "link"
@@ -264,6 +295,7 @@ public struct ClipboardExpandedView: View {
     private func badgeColor(_ type: ClipboardItemType) -> Color {
         switch type {
         case .all: return .white
+        case .pinned: return .yellow
         case .image: return .purple
         case .text: return .blue
         case .url: return .green

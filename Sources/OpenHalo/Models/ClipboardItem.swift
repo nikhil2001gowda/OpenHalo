@@ -3,6 +3,7 @@ import AppKit
 
 public enum ClipboardItemType: String, Sendable, CaseIterable {
     case all = "All"
+    case pinned = "Pinned"
     case image = "Image"
     case text = "Text"
     case url = "Link"
@@ -62,6 +63,11 @@ public struct ClipboardItem: Identifiable, Equatable, Sendable {
             return String(singleLine.prefix(47)) + "..."
         }
         return singleLine
+    }
+
+    public var linkDomain: String? {
+        guard type == .url, let url = URL(string: content.trimmingCharacters(in: .whitespacesAndNewlines)) else { return nil }
+        return url.host?.replacingOccurrences(of: "www.", with: "")
     }
 
     public var relativeTime: String {

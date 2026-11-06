@@ -75,12 +75,14 @@ struct OpenHaloVerifier {
         print("Checking Clipboard item classification and previews...")
         let urlClip = ClipboardItem(content: "https://apple.com/macos")
         assert(urlClip.type == .url, "Expected URL clip type")
+        assert(urlClip.linkDomain == "apple.com", "Expected linkDomain apple.com")
         let hexClip = ClipboardItem(content: "#00E5FF")
         assert(hexClip.type == .color, "Expected Color clip type")
         let codeClip = ClipboardItem(content: "func test() { return 42 }")
         assert(codeClip.type == .code, "Expected Code clip type")
         let textClip = ClipboardItem(content: "Hello, world!")
         assert(textClip.type == .text, "Expected Text clip type")
+        assert(ClipboardItemType.allCases.contains(.pinned), "Expected pinned category")
         print("✅ Clipboard Item classification passed!")
 
         // 6. Test NotchNook & Atoll App Launcher Shortcuts
