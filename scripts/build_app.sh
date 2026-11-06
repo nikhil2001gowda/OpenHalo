@@ -14,6 +14,10 @@ rm -rf "${APP_DIR}"
 mkdir -p "${MACOS_DIR}"
 mkdir -p "${RESOURCES_DIR}"
 
+if [ -d "Resources" ]; then
+    cp -R Resources/* "${RESOURCES_DIR}/"
+fi
+
 cp ".build/release/OpenHalo" "${MACOS_DIR}/OpenHalo"
 chmod +x "${MACOS_DIR}/OpenHalo"
 

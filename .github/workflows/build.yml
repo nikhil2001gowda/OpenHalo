@@ -9,14 +9,20 @@ on:
 jobs:
   build:
     name: Build & Verify macOS App
-    runs-on: macos-14
+    runs-on: macos-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Select Xcode Version
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+        run: |
+          if [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_15.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+          fi
+          xcodebuild -version || true
 
       - name: Run Automated Verification Tests
         run: swift run OpenHaloVerify
