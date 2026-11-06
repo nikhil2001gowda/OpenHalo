@@ -41,8 +41,8 @@ public final class IslandWindowController: NSObject, ObservableObject {
 
     public func showIsland(with rootView: AnyView) {
         let geometry = ScreenNotchDetector.detect()
-        let maxPanelWidth: CGFloat = 520
-        let maxPanelHeight: CGFloat = 350
+        let maxPanelWidth: CGFloat = 580
+        let maxPanelHeight: CGFloat = 380
 
         let screenFrame = geometry.screenFrame
         let originX = screenFrame.midX - (maxPanelWidth / 2.0)
@@ -68,8 +68,8 @@ public final class IslandWindowController: NSObject, ObservableObject {
     public func reposition() {
         guard let panel = panel else { return }
         let geometry = ScreenNotchDetector.detect()
-        let maxPanelWidth: CGFloat = 520
-        let maxPanelHeight: CGFloat = 350
+        let maxPanelWidth: CGFloat = 580
+        let maxPanelHeight: CGFloat = 380
         let screenFrame = geometry.screenFrame
         let originX = screenFrame.midX - (maxPanelWidth / 2.0)
         let originY = screenFrame.maxY - maxPanelHeight

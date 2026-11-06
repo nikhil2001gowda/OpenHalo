@@ -48,11 +48,9 @@ public struct IslandRootView: View {
                                     lineWidth: isDropTargeted ? 1.5 : (shouldShowBorder ? 0.8 : 0)
                                 )
                         )
-                        // Layered multi-stop physical shadow (eliminates fake muddy halo)
-                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.35 : 0), radius: 4, x: 0, y: 2)
-                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.28 : 0), radius: 16, x: 0, y: 8)
-                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.16 : 0), radius: 38, x: 0, y: 18)
-                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.08 : 0), radius: 68, x: 0, y: 30)
+                        // Refined Apple-grade physical shadow: smoothly faded, zero rectangular clipping, compact bottom offset
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.36 : 0), radius: 4, x: 0, y: 2)
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.20 : 0), radius: 15, x: 0, y: 6)
                 } else {
                     RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
                         .fill(Color.black)
@@ -63,11 +61,9 @@ public struct IslandRootView: View {
                                     lineWidth: isDropTargeted ? 1.5 : (shouldShowBorder ? 0.8 : 0)
                                 )
                         )
-                        // Layered multi-stop physical shadow (eliminates fake muddy halo)
-                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.35 : 0), radius: 4, x: 0, y: 2)
-                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.28 : 0), radius: 16, x: 0, y: 8)
-                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.16 : 0), radius: 38, x: 0, y: 18)
-                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.08 : 0), radius: 68, x: 0, y: 30)
+                        // Refined Apple-grade physical shadow: smoothly faded, zero rectangular clipping, compact bottom offset
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.36 : 0), radius: 4, x: 0, y: 2)
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.20 : 0), radius: 15, x: 0, y: 6)
                 }
 
                 // Foreground Content
