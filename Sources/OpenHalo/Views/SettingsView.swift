@@ -174,54 +174,16 @@ public struct SettingsView: View {
     private func sidebarItem(for category: SettingsCategory) -> some View {
         let isSelected = selectedCategory == category
 
-        return Button(action: {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                selectedCategory = category
-            }
-        }) {
-            HStack(spacing: 10) {
-                // Squircle Icon
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: category.gradient,
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 24, height: 24)
-                        .shadow(color: category.gradient.first?.opacity(0.25) ?? .clear, radius: 2, y: 1)
-
-                    Image(systemName: category.icon)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-
-                Text(category.rawValue)
-                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .white : Color.white.opacity(0.75))
-
-                Spacer()
-
-                if category == .faceID && faceService.isFaceAssistEnabled {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 6, height: 6)
+        return SidebarItemButton(
+            category: category,
+            isSelected: isSelected,
+            showFaceIDDot: (category == .faceID && faceService.isFaceAssistEnabled),
+            action: {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                    selectedCategory = category
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(isSelected ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 0.8)
-            )
-        }
-        .buttonStyle(.plain)
+        )
     }
 
     // MARK: - Detail Header
@@ -1141,6 +1103,78 @@ public struct SettingsView: View {
         .padding(8)
         .background(Color.white.opacity(0.02))
         .cornerRadius(6)
+    }
+}
+
+// MARK: - Full-Card Interactive Sidebar Button
+
+struct SidebarItemButton: View {
+    let category: SettingsCategory
+    let isSelected: Bool
+    let showFaceIDDot: Bool
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                // Squircle Icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: category.gradient,
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 24, height: 24)
+                        .shadow(color: category.gradient.first?.opacity(0.25) ?? .clear, radius: 2, y: 1)
+
+                    Image(systemName: category.icon)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+
+                Text(category.rawValue)
+                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
+                    .foregroundColor(isSelected ? .white : Color.white.opacity(0.85))
+
+                Spacer(minLength: 0)
+
+                if showFaceIDDot {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(
+                        isSelected
+                            ? Color.accentColor.opacity(0.85)
+                            : (isHovered ? Color.white.opacity(0.08) : Color.clear)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? Color.white.opacity(0.2) : Color.clear,
+                        lineWidth: 0.8
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .pointingHandCursor()
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
 
