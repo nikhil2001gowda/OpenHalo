@@ -34,7 +34,8 @@ enum KeychainError: LocalizedError {
 }
 
 enum KeychainManager {
-    nonisolated static let service = "com.jonathan.glance"
+    nonisolated static let service = "com.nikhil2001gowda.openhalo"
+    nonisolated private static let legacyService = "com.jonathan.glance"
 
     /// Attributes-only existence check — never prompts, even for access-controlled items.
     nonisolated static func exists(account: String) -> Bool {
@@ -46,7 +47,17 @@ enum KeychainManager {
         ]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        return status != errSecItemNotFound
+        if status != errSecItemNotFound { return true }
+
+        // Fallback check on legacy service
+        let legacyQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: legacyService,
+            kSecAttrAccount as String: account,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var legacyItem: CFTypeRef?
+        return SecItemCopyMatching(legacyQuery as CFDictionary, &legacyItem) != errSecItemNotFound
     }
 
     /// Pass an `LAContext` to authorize a read on an access-controlled item — the OS presents the prompt during this call.
@@ -63,6 +74,27 @@ enum KeychainManager {
         }
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
+
+        // Seamless auto-migration: if not found under com.nikhil2001gowda.openhalo, check legacy com.jonathan.glance
+        if status == errSecItemNotFound {
+            var legacyQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: legacyService,
+                kSecAttrAccount as String: account,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne
+            ]
+            if let context {
+                legacyQuery[kSecUseAuthenticationContext as String] = context
+            }
+            var legacyItem: CFTypeRef?
+            let legacyStatus = SecItemCopyMatching(legacyQuery as CFDictionary, &legacyItem)
+            if legacyStatus == errSecSuccess, let legacyData = legacyItem as? Data {
+                try? save(account: account, data: legacyData)
+                return legacyData
+            }
+        }
+
         switch status {
         case errSecSuccess:
             guard let data = item as? Data else { throw KeychainError.unexpectedData }
@@ -135,6 +167,14 @@ enum KeychainManager {
             kSecAttrAccount as String: account
         ]
         let status = SecItemDelete(query as CFDictionary)
+
+        let legacyQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: legacyService,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(legacyQuery as CFDictionary)
+
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainError.osStatus(status)
         }

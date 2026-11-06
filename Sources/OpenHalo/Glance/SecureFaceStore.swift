@@ -23,9 +23,16 @@ nonisolated enum SecureFaceStore {
     /// Distinct filename/extension so plaintext can never be mistaken for ciphertext.
     private static let fileURL: URL = {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let directory = appSupport.appendingPathComponent("glance", isDirectory: true)
+        let directory = appSupport.appendingPathComponent("OpenHalo", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appendingPathComponent("face-identities.enc")
+        let targetURL = directory.appendingPathComponent("face-identities.enc")
+
+        // Auto-migrate from legacy glance folder if needed
+        let legacyURL = appSupport.appendingPathComponent("glance", isDirectory: true).appendingPathComponent("face-identities.enc")
+        if !FileManager.default.fileExists(atPath: targetURL.path) && FileManager.default.fileExists(atPath: legacyURL.path) {
+            try? FileManager.default.copyItem(at: legacyURL, to: targetURL)
+        }
+        return targetURL
     }()
 
     /// True if a store exists on disk, regardless of whether the session is currently unlocked enough to read it.
