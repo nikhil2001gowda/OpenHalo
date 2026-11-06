@@ -78,16 +78,16 @@ nonisolated enum LivenessScoring {
         let yaws = pairs.map(\.1)
         guard let minYaw = yaws.min(), let maxYaw = yaws.max() else { return .none }
         let yawRange = abs(atan(maxYaw) - atan(minYaw))
-        // Below ~12 degrees the predicted displacement is sub-pixel — matches
+        // Below ~5 degrees the predicted displacement is sub-pixel — matches
         // `GeometryTuning.minYawRangeDegrees`, which gates on the same underlying limit.
-        let minMeasurableRange: CGFloat = 12 * .pi / 180
+        let minMeasurableRange: CGFloat = 5 * .pi / 180
         guard yawRange > minMeasurableRange else { return .none }
 
         guard let correlation = pearsonCorrelation(pairs.map(\.0), pairs.map(\.1)) else { return .none }
         let level = Float(clamp((correlation + 1) / 2, 0, 1))
-        // Confidence ramps in over the next ~15 degrees past the minimum —
+        // Confidence ramps in over the next ~10 degrees past the minimum —
         // more rotation observed, more trustworthy the correlation is.
-        let confidence = Float(clamp((yawRange - minMeasurableRange) / (15 * .pi / 180), 0, 1))
+        let confidence = Float(clamp((yawRange - minMeasurableRange) / (10 * .pi / 180), 0, 1))
         return CueReading(level: level, confidence: confidence)
     }
 
@@ -109,10 +109,8 @@ nonisolated enum LivenessScoring {
 
     // MARK: - Blink dynamics (confirm cue)
 
-    /// Looks for a dip-and-recovery in eye-aspect-ratio. Never mandatory — a short window
-    /// often contains no blink at all, which abstains rather than fails. Thresholds are loose
-    /// because Vision's landmark model doesn't fully collapse the eyelid contour during a real
-    /// blink; recovery is checked within a radius since a blink can span several frames at ~20fps.
+    /// Looks for a dip-and-recovery in eye-aspect-ratio. Never mandatory in Light mode.
+    /// Threshold dipRatio < 0.75 supports users with glasses where reflections prevent full landmark collapse.
     static func blinkDynamics(_ window: [LivenessFrame]) -> CueReading {
         let ears = window.compactMap { frame -> CGFloat? in
             guard let l = frame.leftEyeAspectRatio, let r = frame.rightEyeAspectRatio else { return nil }
@@ -130,7 +128,7 @@ nonisolated enum LivenessScoring {
         let openAfter = ears[(minIndex + 1)...].prefix(recoveryRadius).contains { $0 / baseline > 0.7 }
         let hasNeighborRecovery = minIndex > 0 && minIndex < ears.count - 1 && openBefore && openAfter
 
-        guard dipRatio < 0.65, hasNeighborRecovery else { return .none }
+        guard dipRatio < 0.75, hasNeighborRecovery else { return .none }
         return CueReading(level: 1, confidence: 1)
     }
 

@@ -20,7 +20,7 @@ struct GeometryTuning {
     var motionGate: CGFloat = 0.008
     /// Minimum yaw range (degrees) before geometry votes — closes the "smooth phone wobble" case where
     /// pure translation (no rotation) clears `motionGate` with zero real parallax.
-    var minYawRangeDegrees: CGFloat = 12
+    var minYawRangeDegrees: CGFloat = 5
 
     nonisolated static let `default` = GeometryTuning()
 }
