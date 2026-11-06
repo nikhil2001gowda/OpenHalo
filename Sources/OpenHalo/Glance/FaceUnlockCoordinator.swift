@@ -122,6 +122,12 @@ final class FaceUnlockCoordinator {
             return
         }
 
+        // Must have at least one active (enabled) face profile
+        guard !FaceEnrollmentStore.shared.activeIdentities.isEmpty else {
+            statusMessage = "Face ID paused: all enrolled profiles are disabled"
+            return
+        }
+
         // A deselected trigger means "don't auto-scan for this signal," not "do nothing" — the user can still opt in by hand.
         let shouldAutoScan = GlanceSettings.shared.unlockTriggers.contains(signal)
 
@@ -390,7 +396,12 @@ final class FaceUnlockCoordinator {
             }
 
             // `activeIdentities`, not `identities`: someone switched off on the Your Face page stays enrolled but must not unlock.
-            let scored = pipeline.score(result.embedding, against: FaceEnrollmentStore.shared.activeIdentities)
+            let active = FaceEnrollmentStore.shared.activeIdentities
+            guard !active.isEmpty else {
+                statusMessage = "All face profiles disabled"
+                return .consistentlyWrongFace
+            }
+            let scored = pipeline.score(result.embedding, against: active)
             let matched = pipeline.bestMatch(in: scored, threshold: matchThreshold)
 
             if let matched {

@@ -120,20 +120,9 @@ final class FaceEnrollmentStore {
 
     /// Everyone the user hasn't switched off — what unlock actually scores against. `identities` stays the full list.
     var activeIdentities: [FaceIdentity] {
-        let active = identities.filter(\.isEnabled)
-        if !active.isEmpty { return active }
-        if let stored = UserDefaults.standard.array(forKey: "OpenHalo.FaceID.EnrolledSignature.v2") as? [Float], !stored.isEmpty {
-            let sample = FaceSample(embedding: stored, pose: "center", capturedAt: Date(), quality: 0.95)
-            let fallback = FaceIdentity(
-                id: UUID(),
-                name: NSFullUserName(),
-                samples: [sample],
-                modelIdentifier: "vision-feature-print-v1",
-                embeddingDimension: stored.count,
-                createdAt: Date(),
-                isEnabled: true
-            )
-            return [fallback]
+        if !identities.isEmpty {
+            // Strictly enforce the enabled toggle. If disabled, never unlock for this identity.
+            return identities.filter(\.isEnabled)
         }
         return []
     }

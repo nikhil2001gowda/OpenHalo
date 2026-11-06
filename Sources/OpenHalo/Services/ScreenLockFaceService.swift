@@ -426,6 +426,10 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
     func toggleIdentity(_ identity: FaceIdentity, isEnabled: Bool) {
         do {
             try FaceEnrollmentStore.shared.setEnabled(isEnabled, for: identity.id)
+            if !isEnabled {
+                // Clear any legacy UserDefaults cache so disabled faces cannot bypass the toggle
+                UserDefaults.standard.removeObject(forKey: enrollmentKey)
+            }
             loadEnrolledFace()
             self.statusMessage = isEnabled ? "Enabled '\(identity.name)' for auto-unlock" : "Disabled '\(identity.name)'"
         } catch {
