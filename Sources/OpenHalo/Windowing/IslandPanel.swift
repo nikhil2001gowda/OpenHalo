@@ -33,7 +33,14 @@ public final class IslandPanel: NSPanel {
         self.worksWhenModal = true
         self.isReleasedWhenClosed = false
         self.acceptsMouseMovedEvents = true
-        self.registerForDraggedTypes([.fileURL, .URL, .string])
+        self.registerForDraggedTypes([
+            .fileURL,
+            .URL,
+            .string,
+            NSPasteboard.PasteboardType("NSFilenamesPboardType"),
+            NSPasteboard.PasteboardType("public.file-url"),
+            NSPasteboard.PasteboardType("com.apple.finder.node")
+        ])
     }
 
     public override var canBecomeKey: Bool {

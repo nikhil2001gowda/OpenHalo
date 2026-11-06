@@ -35,7 +35,16 @@ enum KeychainError: LocalizedError {
 
 enum KeychainManager {
     nonisolated static let service = "com.nikhil2001gowda.openhalo"
-    nonisolated private static let legacyService = "com.jonathan.glance"
+
+    private static func createSelfTrustedAccess(description: String) -> SecAccess? {
+        var trustedApp: SecTrustedApplication?
+        let status = SecTrustedApplicationCreateFromPath(nil, &trustedApp)
+        guard status == errSecSuccess, let app = trustedApp else { return nil }
+        var access: SecAccess?
+        let accessStatus = SecAccessCreate(description as CFString, [app] as CFArray, &access)
+        guard accessStatus == errSecSuccess else { return nil }
+        return access
+    }
 
     /// Attributes-only existence check — never prompts, even for access-controlled items.
     nonisolated static func exists(account: String) -> Bool {
@@ -47,17 +56,7 @@ enum KeychainManager {
         ]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        if status != errSecItemNotFound { return true }
-
-        // Fallback check on legacy service
-        let legacyQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: legacyService,
-            kSecAttrAccount as String: account,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var legacyItem: CFTypeRef?
-        return SecItemCopyMatching(legacyQuery as CFDictionary, &legacyItem) != errSecItemNotFound
+        return status != errSecItemNotFound
     }
 
     /// Pass an `LAContext` to authorize a read on an access-controlled item — the OS presents the prompt during this call.
@@ -74,26 +73,6 @@ enum KeychainManager {
         }
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-
-        // Seamless auto-migration: if not found under com.nikhil2001gowda.openhalo, check legacy com.jonathan.glance
-        if status == errSecItemNotFound {
-            var legacyQuery: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: legacyService,
-                kSecAttrAccount as String: account,
-                kSecReturnData as String: true,
-                kSecMatchLimit as String: kSecMatchLimitOne
-            ]
-            if let context {
-                legacyQuery[kSecUseAuthenticationContext as String] = context
-            }
-            var legacyItem: CFTypeRef?
-            let legacyStatus = SecItemCopyMatching(legacyQuery as CFDictionary, &legacyItem)
-            if legacyStatus == errSecSuccess, let legacyData = legacyItem as? Data {
-                try? save(account: account, data: legacyData)
-                return legacyData
-            }
-        }
 
         switch status {
         case errSecSuccess:
@@ -141,7 +120,10 @@ enum KeychainManager {
         if let accessControl {
             addQuery[kSecAttrAccessControl as String] = accessControl
         } else {
-            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            if let access = createSelfTrustedAccess(description: "OpenHalo \(account)") {
+                addQuery[kSecAttrAccess as String] = access
+            }
         }
 
         let status = SecItemAdd(addQuery as CFDictionary, nil)
@@ -167,13 +149,6 @@ enum KeychainManager {
             kSecAttrAccount as String: account
         ]
         let status = SecItemDelete(query as CFDictionary)
-
-        let legacyQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: legacyService,
-            kSecAttrAccount as String: account
-        ]
-        SecItemDelete(legacyQuery as CFDictionary)
 
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainError.osStatus(status)

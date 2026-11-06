@@ -170,59 +170,93 @@ public final class IslandWindowController: NSObject, ObservableObject {
 
 /// Custom hosting view that allows mouse events to pass through transparent regions outside the visible island
 final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
+    private static var acceptedDragTypes: [NSPasteboard.PasteboardType] {
+        [
+            .fileURL,
+            .URL,
+            .string,
+            NSPasteboard.PasteboardType("NSFilenamesPboardType"),
+            NSPasteboard.PasteboardType("public.file-url"),
+            NSPasteboard.PasteboardType("com.apple.finder.node")
+        ]
+    }
+
     @MainActor required init(rootView: Content) {
         super.init(rootView: rootView)
-        registerForDraggedTypes([.fileURL, .URL, .string])
+        registerForDraggedTypes(Self.acceptedDragTypes)
     }
 
     @MainActor required init?(coder: NSCoder) {
         super.init(coder: coder)
-        registerForDraggedTypes([.fileURL, .URL, .string])
+        registerForDraggedTypes(Self.acceptedDragTypes)
     }
 
     // MARK: - NSDraggingDestination Implementation (Drop Support)
 
+    private func pasteboardHasFiles(_ pasteboard: NSPasteboard) -> Bool {
+        guard let types = pasteboard.types else { return false }
+        let accepted: Set<String> = [
+            NSPasteboard.PasteboardType.fileURL.rawValue,
+            NSPasteboard.PasteboardType.URL.rawValue,
+            "NSFilenamesPboardType",
+            "public.file-url",
+            "com.apple.finder.node"
+        ]
+        return types.contains { accepted.contains($0.rawValue) }
+    }
+
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        let urls = FileDropResolver.resolveURLs(from: sender.draggingPasteboard)
-        guard !urls.isEmpty else { return [] }
+        guard pasteboardHasFiles(sender.draggingPasteboard) else {
+            return super.draggingEntered(sender)
+        }
 
         Task { @MainActor in
             let coordinator = IslandCoordinator.shared
             coordinator.fileShelfService.isDropTargetActive = true
+            coordinator.isDropHovered = true
             if !coordinator.state.isExpanded {
                 coordinator.expandTo(tab: .shelf)
             }
         }
-        return .copy
+        let superOp = super.draggingEntered(sender)
+        return superOp.isEmpty ? .copy : superOp
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        let urls = FileDropResolver.resolveURLs(from: sender.draggingPasteboard)
-        guard !urls.isEmpty else { return [] }
-        return .copy
+        guard pasteboardHasFiles(sender.draggingPasteboard) else {
+            return super.draggingUpdated(sender)
+        }
+        let superOp = super.draggingUpdated(sender)
+        return superOp.isEmpty ? .copy : superOp
     }
 
     override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        super.draggingExited(sender)
         Task { @MainActor in
-            IslandCoordinator.shared.fileShelfService.isDropTargetActive = false
+            let coordinator = IslandCoordinator.shared
+            coordinator.fileShelfService.isDropTargetActive = false
+            coordinator.isDropHovered = false
         }
     }
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         let urls = FileDropResolver.resolveURLs(from: sender.draggingPasteboard)
-        guard !urls.isEmpty else { return false }
+        let superHandled = super.performDragOperation(sender)
 
         Task { @MainActor in
             let coordinator = IslandCoordinator.shared
             coordinator.fileShelfService.isDropTargetActive = false
-            coordinator.fileShelfService.addFiles(urls)
-            coordinator.expandTo(tab: .shelf)
+            coordinator.isDropHovered = false
+            if !urls.isEmpty {
+                coordinator.fileShelfService.addFiles(urls)
+                coordinator.expandTo(tab: .shelf)
+            }
         }
-        return true
+        return !urls.isEmpty || superHandled
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
-        // Convert window coordinate point to view local coordinate space (where isFlipped == true, y=0 is at the top)
+        // Convert window coordinate point to view local coordinate space (with isFlipped == true, y=0 is at the top/notch)
         let localPoint = convert(point, from: nil)
 
         let coordinator = IslandCoordinator.shared
@@ -232,9 +266,17 @@ final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
         let minX = (bounds.width - currentWidth) / 2.0
         let islandRect = NSRect(x: minX, y: 0, width: currentWidth, height: currentHeight)
 
-        // If clicking inside the visible island capsule, return the view so SwiftUI buttons/sliders receive the event!
-        if islandRect.contains(localPoint) {
-            return super.hitTest(point)
+        // Drop zone around the notch: generous hit target so dragged files never get discarded
+        let dropZone = NSRect(
+            x: (bounds.width - max(currentWidth, 340)) / 2.0,
+            y: 0,
+            width: max(currentWidth, 340),
+            height: max(currentHeight, 60)
+        )
+
+        // If cursor/drag is inside visible island or drop zone, return view so SwiftUI and dragging receive events
+        if islandRect.contains(localPoint) || dropZone.contains(localPoint) {
+            return super.hitTest(point) ?? self
         }
 
         // When expanded, intercept clicks outside the island capsule to dismiss immediately

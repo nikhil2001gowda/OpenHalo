@@ -49,6 +49,22 @@ public enum FileDropResolver {
             }
         }
 
+        // 4. Try pasteboardItems
+        if let items = pasteboard.pasteboardItems {
+            for item in items {
+                for type in [NSPasteboard.PasteboardType.fileURL, NSPasteboard.PasteboardType("public.file-url")] {
+                    if let str = item.string(forType: type) {
+                        let clean = str.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if let url = URL(string: clean), url.isFileURL, FileManager.default.fileExists(atPath: url.path) {
+                            if !results.contains(where: { $0.path == url.path }) {
+                                results.append(url)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         return results
     }
 
@@ -80,8 +96,8 @@ public enum FileDropResolver {
             }
         }
 
-        // 2. Load item for UTType.fileURL
-        let fileTypes = [UTType.fileURL.identifier, UTType.item.identifier, "public.file-url"]
+        // 2. Load item for UTType.fileURL and conforming file types
+        let fileTypes = [UTType.fileURL.identifier, UTType.item.identifier, UTType.content.identifier, "public.file-url"]
         for typeIdentifier in fileTypes where provider.hasItemConformingToTypeIdentifier(typeIdentifier) {
             let loaded: URL? = await withCheckedContinuation { continuation in
                 provider.loadItem(forTypeIdentifier: typeIdentifier, options: nil) { item, _ in

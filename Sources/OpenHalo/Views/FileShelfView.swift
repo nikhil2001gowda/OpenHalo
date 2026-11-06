@@ -93,6 +93,15 @@ public struct FileShelfView: View {
                                 )
                         )
                 )
+                .onDrop(of: [.fileURL, .item, .data, .content], isTargeted: $isShelfTargeted) { providers in
+                    Task { @MainActor in
+                        let urls = await FileDropResolver.resolveURLs(from: providers)
+                        if !urls.isEmpty {
+                            fileShelfService.addFiles(urls)
+                        }
+                    }
+                    return true
+                }
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -107,7 +116,7 @@ public struct FileShelfView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .onDrop(of: [.fileURL, .item, .data], isTargeted: $isShelfTargeted) { providers in
+        .onDrop(of: [.fileURL, .item, .data, .content], isTargeted: $isShelfTargeted) { providers in
             Task { @MainActor in
                 let urls = await FileDropResolver.resolveURLs(from: providers)
                 if !urls.isEmpty {

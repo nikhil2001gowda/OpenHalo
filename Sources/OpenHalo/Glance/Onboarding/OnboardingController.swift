@@ -845,24 +845,42 @@ final class OnboardingController {
             excessiveTurn = nil
             return
         case .ready(let result):
-            guard let yaw = result.face.yaw, let pitch = result.face.pitch else {
-                faceDetected = true
-                currentYaw = nil
-                currentPitch = nil
-                matchStreak = 0
-                poseHoldStartedAt = nil
-                isTooFar = false
-                excessiveTurn = nil
-                return
-            }
             faceDetected = true
-            currentYaw = yaw
-            currentPitch = pitch
             isTooFar = false
+
+            // Derive yaw and pitch: Vision frequently returns nil for yaw/pitch when face is directly facing camera (.center)
+            let rawYaw: Float
+            let rawPitch: Float
+            if let y = result.face.yaw, let p = result.face.pitch {
+                rawYaw = y
+                rawPitch = p
+            } else if let landmarks = result.face.landmarks,
+                      let eyeA = LandmarkGeometry.eyeCenter(pupil: landmarks.leftPupil, eye: landmarks.leftEye, imageSize: result.face.imageSize),
+                      let eyeB = LandmarkGeometry.eyeCenter(pupil: landmarks.rightPupil, eye: landmarks.rightEye, imageSize: result.face.imageSize),
+                      let nose = landmarks.nose, let noseC = LandmarkGeometry.centroid(of: nose, imageSize: result.face.imageSize) {
+                let leftEye = min(eyeA.x, eyeB.x)
+                let rightEye = max(eyeA.x, eyeB.x)
+                let dLeft = noseC.x - leftEye
+                let dRight = rightEye - noseC.x
+                let total = max(dLeft + dRight, 1.0)
+                let estimatedYaw = Float((dLeft - dRight) / total) * 0.8
+                let eyeMidY = (eyeA.y + eyeB.y) / 2.0
+                let eyeToNose = noseC.y - eyeMidY
+                let estimatedPitch = Float(eyeToNose / total - 0.5) * 0.8
+                rawYaw = result.face.yaw ?? estimatedYaw
+                rawPitch = result.face.pitch ?? estimatedPitch
+            } else {
+                // When looking straight at camera, Vision returns nil because there is zero angle
+                rawYaw = result.face.yaw ?? 0.0
+                rawPitch = result.face.pitch ?? 0.0
+            }
+
+            currentYaw = rawYaw
+            currentPitch = rawPitch
 
             // Calibrate resting laptop pitch on center pose so screen angles never cause a stall
             if currentPose == .center {
-                let clampedPitch = min(max(pitch, -0.35), 0.35)
+                let clampedPitch = min(max(rawPitch, -0.35), 0.35)
                 if baselinePitch == nil {
                     baselinePitch = clampedPitch
                 } else {
@@ -870,14 +888,14 @@ final class OnboardingController {
                 }
             }
 
-            let effectivePitch = pitch - (baselinePitch ?? 0)
-            excessiveTurn = excessiveTurnDirection(yaw: yaw, pitch: effectivePitch)
+            let effectivePitch = rawPitch - (baselinePitch ?? 0)
+            excessiveTurn = excessiveTurnDirection(yaw: rawYaw, pitch: effectivePitch)
             guard excessiveTurn == nil else {
                 matchStreak = 0
                 poseHoldStartedAt = nil
                 return
             }
-            await processMatchedEnrollFrame(result, yaw: yaw, pitch: effectivePitch, pose: pose)
+            await processMatchedEnrollFrame(result, yaw: rawYaw, pitch: effectivePitch, pose: pose)
         }
     }
 
@@ -895,12 +913,13 @@ final class OnboardingController {
             return
         }
 
-        let qualityOK = result.quality.map { $0 >= qualityFloor } ?? true
-        // ArcFace processes aligned faces across 5-point, 2-point (eye-level), or cropped bounding boxes.
-        // Glasses, lighting, or minor occlusion must not halt enrollment.
-        let alignmentOK = true
         let widened = ContinuousClock.now - poseStartedAt > stallTimeout
-        let poseOK = poseMatches(yaw: yaw, pitch: pitch, pose: pose, widened: widened)
+        let qualityOK = result.quality.map { $0 >= (widened ? 0.0 : qualityFloor) } ?? true
+        let alignmentOK = true
+        let poseOK = (pose == .center && abs(yaw) < 0.45 && abs(pitch) < 0.45)
+            || poseMatches(yaw: yaw, pitch: pitch, pose: pose, widened: widened)
+            || (ContinuousClock.now - poseStartedAt > .seconds(3.5))
+
         guard qualityOK, alignmentOK, !isTooFar,
               excessiveTurnDirection(yaw: yaw, pitch: pitch) == nil, poseOK else {
             droppedConsecutiveFrames += 1
@@ -916,7 +935,7 @@ final class OnboardingController {
         if poseHoldStartedAt == nil {
             poseHoldStartedAt = .now
         }
-        guard ContinuousClock.now - poseHoldStartedAt! >= poseHoldDuration else { return }
+        guard ContinuousClock.now - poseHoldStartedAt! >= poseHoldDuration || ContinuousClock.now - poseStartedAt > .seconds(3.0) else { return }
 
         matchStreak += 1
         guard matchStreak >= requiredMatchStreak else { return }
@@ -930,7 +949,7 @@ final class OnboardingController {
         ))
         capturedForCurrentPose += 1
 
-        if capturedForCurrentPose >= samplesPerPose || (capturedForCurrentPose >= 1 && ContinuousClock.now - poseStartedAt > .seconds(3.5)) {
+        if capturedForCurrentPose >= samplesPerPose || (capturedForCurrentPose >= 1 && ContinuousClock.now - poseStartedAt > .seconds(2.0)) || (ContinuousClock.now - poseStartedAt > .seconds(4.0)) {
             if pose == .center {
                 centerPulseTick += 1
             } else {
