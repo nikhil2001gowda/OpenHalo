@@ -54,16 +54,13 @@ public final class SystemControlService: ObservableObject {
         }
     }
 
-    // MARK: - Periodic Hardware Sync (Catches F1/F2 & F11/F12 Keyboard Keys)
+    // MARK: - Hardware Sync (Event-Driven via CoreAudio & NSEvent Media Keys)
 
     public func startPeriodicSync() {
         syncTimer?.invalidate()
-        syncTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
-                self.syncHardwareState()
-            }
-        }
+        syncTimer = nil
+        // One-time sync on launch; ongoing changes are handled 100% event-driven by CoreAudio & NSEvent monitors
+        syncHardwareState()
     }
 
     public func stopHardwareVolumeListener() {

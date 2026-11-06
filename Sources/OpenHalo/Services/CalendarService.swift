@@ -224,6 +224,7 @@ public final class CalendarService: ObservableObject {
                 self?.fetchUpcomingEvents()
             }
         }
+        refreshTimer?.tolerance = 30.0
     }
 }
 

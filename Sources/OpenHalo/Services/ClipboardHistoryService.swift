@@ -20,11 +20,13 @@ public final class ClipboardHistoryService: ObservableObject {
 
     public func startMonitoring() {
         pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        // 1.5s polling with 0.5s timer coalescing tolerance for low idle CPU
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.checkForNewClip()
             }
         }
+        pollTimer?.tolerance = 0.5
     }
 
     public func stopMonitoring() {

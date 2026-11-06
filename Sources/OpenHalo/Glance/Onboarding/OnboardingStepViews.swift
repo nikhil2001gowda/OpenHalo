@@ -314,24 +314,54 @@ struct EnrollStepView: View {
     }
 
     private var instructionLabel: some View {
-        Text(controller.enrollmentInstruction)
-            .font(GlanceTheme.Font.instruction)
-            .foregroundStyle(.white)
-            .multilineTextAlignment(.center)
-            .lineLimit(2)
-            .minimumScaleFactor(0.8)
-            .id(controller.enrollmentInstruction)
-            .transition(.opacity)
-            .animation(.easeInOut(duration: 0.2), value: controller.enrollmentInstruction)
-            .opacity(controller.guideVisible ? 1 : 0)
-            .animation(
-                .easeInOut(
-                    duration: controller.guideVisible
-                        ? OnboardingMetrics.enrollInstructionFadeIn
-                        : OnboardingMetrics.enrollInstructionFadeOut
-                ),
-                value: controller.guideVisible
-            )
+        VStack(spacing: 5) {
+            Text(controller.enrollmentInstruction)
+                .font(GlanceTheme.Font.instruction)
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .id(controller.enrollmentInstruction)
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.2), value: controller.enrollmentInstruction)
+
+            if !controller.enrollmentComplete {
+                Text("Pose \(min(controller.currentPoseIndex + 1, 9)) of 9 • \(Int(controller.overallEnrollmentProgress * 100))% Scanned")
+                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                    .foregroundColor(Color.white.opacity(0.65))
+
+                // Dual-tone Glance progress bar
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.15))
+                            .frame(height: 3.5)
+
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.cyan, Color.green],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: max(4, geo.size.width * CGFloat(controller.overallEnrollmentProgress)), height: 3.5)
+                            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: controller.overallEnrollmentProgress)
+                    }
+                }
+                .frame(width: 140, height: 3.5)
+                .padding(.top, 2)
+            }
+        }
+        .opacity(controller.guideVisible ? 1 : 0)
+        .animation(
+            .easeInOut(
+                duration: controller.guideVisible
+                    ? OnboardingMetrics.enrollInstructionFadeIn
+                    : OnboardingMetrics.enrollInstructionFadeOut
+            ),
+            value: controller.guideVisible
+        )
     }
 }
 

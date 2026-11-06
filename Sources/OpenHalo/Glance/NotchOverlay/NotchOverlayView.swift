@@ -298,10 +298,10 @@ struct NotchOverlayView: View {
                 )
             }
         )
-        // Shadow only while expanded — otherwise it left a faint dim halo around the
-        // real notch even while "closed" in armed mode. Radius is fixed rather than
-        // growing on hover since a larger radius needs more window margin than is reserved.
-        .shadow(color: .black.opacity(visualIsExpanded ? (isHovering ? 0.55 : 0.3) : 0), radius: 9)
+        // Layered physical shadow only while expanded — avoids abrupt cutoff on dark windows
+        .shadow(color: .black.opacity(visualIsExpanded ? (isHovering ? 0.35 : 0.22) : 0), radius: 5, y: 2)
+        .shadow(color: .black.opacity(visualIsExpanded ? (isHovering ? 0.25 : 0.15) : 0), radius: 18, y: 8)
+        .shadow(color: .black.opacity(visualIsExpanded ? (isHovering ? 0.12 : 0.08) : 0), radius: 40, y: 18)
         // Drives the per-step resize while onboarding is active — `visualIsExpanded`
         // alone only fires on entering/leaving the expanded state.
         .animation(expansionAnimation(entering: true), value: onboardingController?.panelSize)

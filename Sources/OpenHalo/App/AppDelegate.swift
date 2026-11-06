@@ -24,6 +24,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Check first-run permissions
         checkFirstLaunchPermissions()
+
+        // Visually present Preferences window so user immediately sees OpenHalo is active
+        Task { @MainActor in
+            SettingsWindowManager.shared.show()
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        Task { @MainActor in
+            SettingsWindowManager.shared.show()
+            IslandCoordinator.shared.toggleExpanded()
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        return true
     }
 
     private func checkFirstLaunchPermissions() {
@@ -105,11 +120,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
             button.image = NSImage(systemSymbolName: "circle.circle", accessibilityDescription: "OpenHalo")
+            button.toolTip = "OpenHalo — Dynamic Island & Face ID"
         }
 
         let menu = NSMenu()
 
-        let toggleItem = NSMenuItem(title: "Toggle Island", action: #selector(toggleIsland), keyEquivalent: "i")
+        let prefItem = NSMenuItem(title: "OpenHalo Preferences & Face ID...", action: #selector(openPreferences), keyEquivalent: ",")
+        menu.addItem(prefItem)
+
+        let toggleItem = NSMenuItem(title: "Toggle Dynamic Island", action: #selector(toggleIsland), keyEquivalent: "i")
         toggleItem.keyEquivalentModifierMask = [.command, .control]
         menu.addItem(toggleItem)
 

@@ -140,7 +140,7 @@ enum SecureCredentialManager {
     // MARK: - Public API
 
     nonisolated static func hasStoredPassword() -> Bool {
-        KeychainManager.exists(account: passwordBlobAccount) || KeychainHelper.hasPassword()
+        KeychainManager.exists(account: passwordBlobAccount) || KeychainHelper.hasDirectKeychainItem()
     }
 
     /// Prompts Touch ID and unwraps the session key, creating it Touch-ID-gated on first run. Caches only after a real gated
@@ -219,9 +219,10 @@ enum SecureCredentialManager {
             return plaintext
         }
 
-        // 3. Fallback to KeychainHelper getPassword
-        if let fallback = KeychainHelper.getPassword(), let data = fallback.data(using: .utf8) {
+        // 3. Fallback to direct macOS Keychain item without recursion
+        if let direct = KeychainHelper.readDirectKeychainPassword(), let data = direct.data(using: .utf8) {
             recordActivity()
+            KeychainHelper.setMemoryCachedPassword(direct)
             return data
         }
 

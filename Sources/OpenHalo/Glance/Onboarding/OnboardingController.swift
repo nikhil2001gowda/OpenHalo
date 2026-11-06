@@ -113,10 +113,10 @@ enum EnrollmentPose: Int, CaseIterable {
     /// Relaxes this pose's yaw/pitch bands — same knob as `stallWidenFactor`, so >1 is easier.
     var matchLeniency: Float {
         switch self {
-        case .center: return 1.4
+        case .center: return 1.5
         case .bottomLeft, .bottomRight: return 1.5
-        case .bottom: return 1.3
-        default: return 1.15
+        case .bottom: return 1.4
+        default: return 1.3
         }
     }
 
@@ -349,16 +349,16 @@ final class OnboardingController {
     private let samplesPerPose = 2
     /// Consecutive matching frames required before a capture fires — debounces a lucky
     /// frame near a pose boundary.
-    private let requiredMatchStreak = 2
+    private let requiredMatchStreak = 1
     /// Wait this long after yaw/pitch matches before samples count, so the user has
     /// settled into the turn rather than being captured mid-motion.
-    private let poseHoldDuration: Duration = .milliseconds(350)
+    private let poseHoldDuration: Duration = .milliseconds(220)
     /// Permissive floor for Vision's capture-quality score (no fixed universal cutoff) —
     /// better to accept a mediocre sample than stall the whole flow.
     private let qualityFloor: Float = 0.05
     /// Hold off accepting captures briefly once the camera comes up, so the first
     /// samples aren't taken mid-blink. Detection still runs during this window.
-    private let initialCaptureDelay: Duration = .milliseconds(600)
+    private let initialCaptureDelay: Duration = .milliseconds(400)
     /// Enrollment accepts comfortable desk distances (40-70cm) without demanding an unnatural close-up
     private var enrollmentMinimumFaceWidth: Float {
         0.08
@@ -366,16 +366,19 @@ final class OnboardingController {
 
     // Pose-matching bands, in radians. Yaw: left turn is positive, matching the mirrored
     // preview. Pitch's sign is the opposite of the initial guess — see `pitchMatches` below.
-    private let yawInnerThreshold: Float = 0.18
-    private let yawCenterTolerance: Float = 0.28
-    private let yawOuterCap: Float = 0.65
-    private let pitchInnerThreshold: Float = 0.14
-    private let pitchCenterTolerance: Float = 0.28
-    private let pitchOuterCap: Float = 0.55
+    private let yawInnerThreshold: Float = 0.12
+    private let yawCenterTolerance: Float = 0.35
+    private let yawOuterCap: Float = 0.75
+    private let pitchInnerThreshold: Float = 0.09
+    private let pitchCenterTolerance: Float = 0.35
+    private let pitchOuterCap: Float = 0.70
     /// If a pose takes longer than this, matching bands widen by `stallWidenFactor` so an
     /// unusual camera angle can't permanently strand the user.
-    private let stallTimeout: Duration = .seconds(4)
-    private let stallWidenFactor: Float = 1.35
+    private let stallTimeout: Duration = .seconds(2)
+    private let stallWidenFactor: Float = 1.40
+
+    /// Resting camera pitch baseline calibrated when facing center; cancels out laptop screen tilt.
+    private var baselinePitch: Float? = nil
 
     private(set) var currentPoseIndex = 0
     private(set) var capturedForCurrentPose = 0
@@ -478,9 +481,10 @@ final class OnboardingController {
               let pose = currentPose, pose != .center,
               let yaw = currentYaw, let pitch = currentPitch else { return nil }
 
+        let effectivePitch = pitch - (baselinePitch ?? 0)
         // Vision inverts both axes vs. the screen: +yaw turns left, +pitch looks down.
         let x = Double(-yaw / (yawInnerThreshold / pose.matchLeniency))
-        let y = Double(-pitch / (pitchInnerThreshold / pose.matchLeniency))
+        let y = Double(-effectivePitch / (pitchInnerThreshold / pose.matchLeniency))
 
         let magnitude = (x * x + y * y).squareRoot()
         guard magnitude > headTurnDeadzone else { return nil }
@@ -628,6 +632,7 @@ final class OnboardingController {
 
     /// Note `pendingName` deliberately survives — no reason to make the user retype it.
     private func resetEnrollmentState() {
+        baselinePitch = nil
         collectedSamples = []
         nameError = nil
         currentPoseIndex = 0
@@ -854,13 +859,25 @@ final class OnboardingController {
             currentYaw = yaw
             currentPitch = pitch
             isTooFar = false
-            excessiveTurn = excessiveTurnDirection(yaw: yaw, pitch: pitch)
+
+            // Calibrate resting laptop pitch on center pose so screen angles never cause a stall
+            if currentPose == .center {
+                let clampedPitch = min(max(pitch, -0.35), 0.35)
+                if baselinePitch == nil {
+                    baselinePitch = clampedPitch
+                } else {
+                    baselinePitch = (baselinePitch! * 0.85) + (clampedPitch * 0.15)
+                }
+            }
+
+            let effectivePitch = pitch - (baselinePitch ?? 0)
+            excessiveTurn = excessiveTurnDirection(yaw: yaw, pitch: effectivePitch)
             guard excessiveTurn == nil else {
                 matchStreak = 0
                 poseHoldStartedAt = nil
                 return
             }
-            await processMatchedEnrollFrame(result, yaw: yaw, pitch: pitch, pose: pose)
+            await processMatchedEnrollFrame(result, yaw: yaw, pitch: effectivePitch, pose: pose)
         }
     }
 
@@ -887,7 +904,7 @@ final class OnboardingController {
         guard qualityOK, alignmentOK, !isTooFar,
               excessiveTurnDirection(yaw: yaw, pitch: pitch) == nil, poseOK else {
             droppedConsecutiveFrames += 1
-            if droppedConsecutiveFrames >= 4 {
+            if droppedConsecutiveFrames >= 8 {
                 matchStreak = 0
                 poseHoldStartedAt = nil
             }
@@ -913,7 +930,7 @@ final class OnboardingController {
         ))
         capturedForCurrentPose += 1
 
-        if capturedForCurrentPose >= samplesPerPose {
+        if capturedForCurrentPose >= samplesPerPose || (capturedForCurrentPose >= 1 && ContinuousClock.now - poseStartedAt > .seconds(3.5)) {
             if pose == .center {
                 centerPulseTick += 1
             } else {
@@ -938,8 +955,8 @@ final class OnboardingController {
     private func yawMatches(_ yaw: Float, band: EnrollmentPose.YawBand, factor: Float) -> Bool {
         switch band {
         case .none: return abs(yaw) < yawCenterTolerance * factor
-        case .left: return yaw > yawInnerThreshold / factor && yaw < yawOuterCap
-        case .right: return yaw < -yawInnerThreshold / factor && yaw > -yawOuterCap
+        case .left: return yaw > (yawInnerThreshold / factor) && yaw < yawOuterCap
+        case .right: return yaw < -(yawInnerThreshold / factor) && yaw > -yawOuterCap
         }
     }
 
@@ -949,7 +966,7 @@ final class OnboardingController {
     private func excessiveTurnDirection(yaw: Float, pitch: Float) -> ExcessiveTurn? {
         let yawOvershoot = abs(yaw) / yawOuterCap
         let pitchOvershoot = abs(pitch) / pitchOuterCap
-        guard max(yawOvershoot, pitchOvershoot) >= 1 else { return nil }
+        guard max(yawOvershoot, pitchOvershoot) >= 1.05 else { return nil }
 
         let yawExceeded = yawOvershoot >= 1
         let pitchExceeded = pitchOvershoot >= 1

@@ -131,7 +131,7 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
 
         // Gate 2: Face Enrollment
         guard hasEnrolledFace || !FaceEnrollmentStore.shared.activeIdentities.isEmpty else {
-            permissionErrorMessage = "Face Profile Required\n\nPlease enroll your face first using Guided Notch Sweep or Modal Enrollment before enabling Face ID."
+            permissionErrorMessage = "Face Profile Required\n\nPlease enroll your face first using the Guided Notch Sweep before enabling Face ID."
             isShowingPermissionAlert = true
             isFaceAssistEnabled = false
             return
@@ -331,20 +331,22 @@ public final class ScreenLockFaceService: NSObject, ObservableObject {
     }
 
     private func checkPoseMatch(pose: EnrollmentPose, yaw: Float, pitch: Float) -> Bool {
-        let yawThresh: Float = 0.20
-        let pitchThresh: Float = 0.15
+        let yawThresh: Float = 0.12
+        let pitchThresh: Float = 0.09
+        let centerYawTol: Float = 0.35
+        let centerPitchTol: Float = 0.35
 
         switch pose {
         case .center:
-            return abs(yaw) < 0.18 && abs(pitch) < 0.14
+            return abs(yaw) < centerYawTol && abs(pitch) < centerPitchTol
         case .left:
-            return yaw > yawThresh && abs(pitch) < 0.18
+            return yaw > yawThresh && abs(pitch) < centerPitchTol
         case .right:
-            return yaw < -yawThresh && abs(pitch) < 0.18
+            return yaw < -yawThresh && abs(pitch) < centerPitchTol
         case .top:
-            return pitch < -pitchThresh && abs(yaw) < 0.20
+            return pitch < -pitchThresh && abs(yaw) < centerYawTol
         case .bottom:
-            return pitch > pitchThresh && abs(yaw) < 0.20
+            return pitch > pitchThresh && abs(yaw) < centerYawTol
         case .topLeft:
             return yaw > (yawThresh * 0.7) && pitch < -(pitchThresh * 0.7)
         case .topRight:

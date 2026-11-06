@@ -165,13 +165,6 @@ public final class IslandWindowController: NSObject, ObservableObject {
                 self?.panel?.orderFrontRegardless()
             }
         }
-
-        // 5. Watchdog Periodic Re-assert: Ensure no app or full-screen window ever occludes the Dynamic Island
-        orderFrontTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.panel?.orderFrontRegardless()
-            }
-        }
     }
 }
 

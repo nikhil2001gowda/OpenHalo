@@ -23,6 +23,17 @@ public struct IslandRootView: View {
         return true
     }
 
+    private var capsuleBorderGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                isDropTargeted ? Color.cyan : (shouldShowBorder ? Color.white.opacity(0.16) : Color.clear),
+                isDropTargeted ? Color.cyan.opacity(0.6) : (shouldShowBorder ? Color.white.opacity(0.06) : Color.clear)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .top) {
@@ -33,22 +44,30 @@ public struct IslandRootView: View {
                         .overlay(
                             AtollBottomRoundedRectangle(radius: currentCornerRadius)
                                 .strokeBorder(
-                                    isDropTargeted ? Color.cyan : (shouldShowBorder ? Color.white.opacity(0.12) : Color.clear),
+                                    capsuleBorderGradient,
                                     lineWidth: isDropTargeted ? 1.5 : (shouldShowBorder ? 0.8 : 0)
                                 )
                         )
-                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.7 : 0), radius: 18, x: 0, y: 8)
+                        // Layered multi-stop physical shadow (eliminates fake muddy halo)
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.35 : 0), radius: 4, x: 0, y: 2)
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.28 : 0), radius: 16, x: 0, y: 8)
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.16 : 0), radius: 38, x: 0, y: 18)
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.08 : 0), radius: 68, x: 0, y: 30)
                 } else {
                     RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
                         .fill(Color.black)
                         .overlay(
                             RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
                                 .strokeBorder(
-                                    isDropTargeted ? Color.cyan : (shouldShowBorder ? Color.white.opacity(0.12) : Color.clear),
+                                    capsuleBorderGradient,
                                     lineWidth: isDropTargeted ? 1.5 : (shouldShowBorder ? 0.8 : 0)
                                 )
                         )
-                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.7 : 0), radius: 18, x: 0, y: 8)
+                        // Layered multi-stop physical shadow (eliminates fake muddy halo)
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.35 : 0), radius: 4, x: 0, y: 2)
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.28 : 0), radius: 16, x: 0, y: 8)
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.16 : 0), radius: 38, x: 0, y: 18)
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.08 : 0), radius: 68, x: 0, y: 30)
                 }
 
                 // Foreground Content

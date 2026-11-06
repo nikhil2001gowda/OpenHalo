@@ -86,7 +86,7 @@ public final class PowerSuspensionCoordinator: ObservableObject {
         wakeCount += 1
 
         let coordinator = IslandCoordinator.shared
-        coordinator.hardwareMonitor.startPolling()
+        // hardwareMonitor only polls on-demand when user is viewing .system tab
         coordinator.audioMonitor.startMonitoring()
         coordinator.systemControls.startHardwareVolumeListener()
         coordinator.clipboardService.startMonitoring()

@@ -94,12 +94,13 @@ public final class MediaService: ObservableObject {
 
     public func startPolling() {
         pollTimer?.invalidate()
-        // Fast 1.2s polling so YouTube / browser media Live Activity reacts immediately
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.2, repeats: true) { [weak self] _ in
+        // Eco-friendly 5.0s polling with 2.5s system tolerance: CoreAudio hardware listener handles instant playback start/stop
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.checkActivePlayers()
             }
         }
+        pollTimer?.tolerance = 2.5
     }
 
     public func stopPolling() {
@@ -202,6 +203,7 @@ public final class MediaService: ObservableObject {
                     }
                 }
             }
+            progressTimer?.tolerance = 0.5
         }
     }
 
@@ -299,8 +301,21 @@ public final class MediaService: ObservableObject {
     // MARK: - Multi-Source Media Detection (Music, Spotify, Chrome, Safari, YouTube, Web)
 
     public func checkActivePlayers() {
-        Task.detached(priority: .userInitiated) {
+        Task.detached(priority: .utility) {
             let isSystemAudioActive = Self.isSystemAudioOutputting()
+
+            // Eco Guard: If system audio hardware is completely silent, skip heavy AppleScript processes
+            guard isSystemAudioActive else {
+                await MainActor.run {
+                    self.pausedSince = nil
+                    if self.currentTrack.playbackState == .playing {
+                        self.currentTrack.playbackState = .paused
+                        self.isAvailable = false
+                        self.updateProgressTimer()
+                    }
+                }
+                return
+            }
 
             // 1. Check Apple Music
             if Self.isAppRunning(bundleID: "com.apple.Music") {

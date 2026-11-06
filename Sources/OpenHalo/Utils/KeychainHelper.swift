@@ -59,19 +59,21 @@ public enum KeychainHelper {
         return success
     }
 
-    /// Synchronous read with memory and local AES-GCM vault fallback first — never prompts if cached!
-    public static func getPassword() -> String? {
-        if let cached = getMemoryCachedPassword(), !cached.isEmpty {
-            return cached
-        }
+    /// Direct macOS Keychain query without calling SecureCredentialManager (guarantees zero recursion)
+    public static func hasDirectKeychainItem() -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: serviceName,
+            kSecAttrAccount as String: accountName,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        return status == errSecSuccess
+    }
 
-        // Check resilient local AES-GCM vault (zero security popups)
-        if let localData = try? SecureCredentialManager.readPassword(),
-           let str = String(data: localData, encoding: .utf8), !str.isEmpty {
-            setMemoryCachedPassword(str)
-            return str
-        }
-
+    /// Direct macOS Keychain read without calling SecureCredentialManager (guarantees zero recursion)
+    public static func readDirectKeychainPassword() -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
@@ -79,14 +81,26 @@ public enum KeychainHelper {
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
-
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess, let data = item as? Data, let str = String(data: data, encoding: .utf8) else {
             return nil
         }
-        setMemoryCachedPassword(str)
         return str
+    }
+
+    /// Synchronous read with memory cache and direct Keychain read (never recurses)
+    public static func getPassword() -> String? {
+        if let cached = getMemoryCachedPassword(), !cached.isEmpty {
+            return cached
+        }
+
+        if let direct = readDirectKeychainPassword(), !direct.isEmpty {
+            setMemoryCachedPassword(direct)
+            return direct
+        }
+
+        return nil
     }
 
     /// Asynchronous read running detached with timeout to ensure the main thread NEVER hangs.
@@ -95,28 +109,16 @@ public enum KeychainHelper {
             return cached
         }
 
-        // Check resilient local AES-GCM vault
-        if let localData = try? SecureCredentialManager.readPassword(),
-           let str = String(data: localData, encoding: .utf8), !str.isEmpty {
-            setMemoryCachedPassword(str)
-            return str
+        if let direct = readDirectKeychainPassword(), !direct.isEmpty {
+            setMemoryCachedPassword(direct)
+            return direct
         }
 
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let query: [String: Any] = [
-                    kSecClass as String: kSecClassGenericPassword,
-                    kSecAttrService as String: serviceName,
-                    kSecAttrAccount as String: accountName,
-                    kSecReturnData as String: true,
-                    kSecMatchLimit as String: kSecMatchLimitOne
-                ]
-
-                var item: CFTypeRef?
-                let status = SecItemCopyMatching(query as CFDictionary, &item)
-                if status == errSecSuccess, let data = item as? Data, let str = String(data: data, encoding: .utf8) {
-                    setMemoryCachedPassword(str)
-                    continuation.resume(returning: str)
+                if let direct = readDirectKeychainPassword() {
+                    setMemoryCachedPassword(direct)
+                    continuation.resume(returning: direct)
                 } else {
                     continuation.resume(returning: nil)
                 }
@@ -126,16 +128,9 @@ public enum KeychainHelper {
 
     public static func hasPassword() -> Bool {
         if getMemoryCachedPassword() != nil { return true }
-        if (try? SecureCredentialManager.readPassword()) != nil { return true }
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: accountName,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        return status != errSecItemNotFound
+        if hasDirectKeychainItem() { return true }
+        if KeychainManager.exists(account: "password_blob") { return true }
+        return false
     }
 
     public static func deletePassword() {
