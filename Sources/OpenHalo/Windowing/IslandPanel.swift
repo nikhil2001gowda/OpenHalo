@@ -30,6 +30,7 @@ public final class IslandPanel: NSPanel {
         self.isMovable = false
         self.hidesOnDeactivate = false
         self.acceptsMouseMovedEvents = true
+        self.registerForDraggedTypes([.fileURL, .URL, .string])
     }
 
     public override var canBecomeKey: Bool {

@@ -56,3 +56,4 @@ OpenHalo is also deeply inspired by several exceptional commercial and independe
 OpenHalo is released under the **MIT License**. Components adapted or ported from GPL-licensed projects ([Glance](https://github.com/jonathan-kosgei/glance) and [Atoll](https://github.com/Ebullioscopic/Atoll)) retain their original copyright notices and license headers within their respective directories (`Sources/OpenHalo/Glance/` and `Sources/OpenHalo/Atoll/`).
 
 We extend our sincere thanks to all authors and contributors for their outstanding work and dedication to the open-source ecosystem.
+

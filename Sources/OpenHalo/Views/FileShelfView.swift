@@ -2,9 +2,14 @@ import SwiftUI
 
 public struct FileShelfView: View {
     @ObservedObject var fileShelfService: FileShelfService
+    @State private var isShelfTargeted: Bool = false
 
     public init(fileShelfService: FileShelfService) {
         self.fileShelfService = fileShelfService
+    }
+
+    private var isTargetedActive: Bool {
+        isShelfTargeted || fileShelfService.isDropTargetActive
     }
 
     public var body: some View {
@@ -66,18 +71,27 @@ public struct FileShelfView: View {
             // Content: Empty or List
             if fileShelfService.items.isEmpty {
                 VStack(spacing: 6) {
-                    Image(systemName: "arrow.down.doc")
+                    Image(systemName: isTargetedActive ? "arrow.down.circle.fill" : "arrow.down.doc")
                         .font(.system(size: 24))
-                        .foregroundColor(Color.white.opacity(0.35))
+                        .foregroundColor(isTargetedActive ? .cyan : Color.white.opacity(0.35))
+                        .scaleEffect(isTargetedActive ? 1.15 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isTargetedActive)
 
-                    Text("Drag & drop files here to stash, AirDrop, or SIPS convert")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color.white.opacity(0.5))
+                    Text(isTargetedActive ? "Release to Stash in OpenHalo Shelf" : "Drag & drop files here to stash, AirDrop, or SIPS convert")
+                        .font(.system(size: 11, weight: isTargetedActive ? .semibold : .regular))
+                        .foregroundColor(isTargetedActive ? .cyan : Color.white.opacity(0.5))
                 }
                 .frame(maxWidth: .infinity, minHeight: 65)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [4]))
+                        .fill(isTargetedActive ? Color.cyan.opacity(0.08) : Color.clear)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(
+                                    isTargetedActive ? Color.cyan : Color.white.opacity(0.15),
+                                    style: StrokeStyle(lineWidth: isTargetedActive ? 1.5 : 1, dash: [4])
+                                )
+                        )
                 )
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -93,6 +107,15 @@ public struct FileShelfView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .onDrop(of: [.fileURL, .item, .data], isTargeted: $isShelfTargeted) { providers in
+            Task { @MainActor in
+                let urls = await FileDropResolver.resolveURLs(from: providers)
+                if !urls.isEmpty {
+                    fileShelfService.addFiles(urls)
+                }
+            }
+            return true
+        }
     }
 
     private func shelfItemChip(_ item: ShelfItem) -> some View {
@@ -134,6 +157,9 @@ public struct FileShelfView: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.white.opacity(0.1))
         )
+        .onDrag {
+            NSItemProvider(object: item.url as NSURL)
+        }
         .onTapGesture(count: 2) {
             fileShelfService.openFile(item)
         }

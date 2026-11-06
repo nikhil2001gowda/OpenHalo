@@ -148,6 +148,57 @@ public final class IslandWindowController: NSObject, ObservableObject {
 
 /// Custom hosting view that allows mouse events to pass through transparent regions outside the visible island
 final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
+    @MainActor required init(rootView: Content) {
+        super.init(rootView: rootView)
+        registerForDraggedTypes([.fileURL, .URL, .string])
+    }
+
+    @MainActor required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        registerForDraggedTypes([.fileURL, .URL, .string])
+    }
+
+    // MARK: - NSDraggingDestination Implementation (Drop Support)
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        let urls = FileDropResolver.resolveURLs(from: sender.draggingPasteboard)
+        guard !urls.isEmpty else { return [] }
+
+        Task { @MainActor in
+            let coordinator = IslandCoordinator.shared
+            coordinator.fileShelfService.isDropTargetActive = true
+            if !coordinator.state.isExpanded {
+                coordinator.expandTo(tab: .shelf)
+            }
+        }
+        return .copy
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        let urls = FileDropResolver.resolveURLs(from: sender.draggingPasteboard)
+        guard !urls.isEmpty else { return [] }
+        return .copy
+    }
+
+    override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        Task { @MainActor in
+            IslandCoordinator.shared.fileShelfService.isDropTargetActive = false
+        }
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        let urls = FileDropResolver.resolveURLs(from: sender.draggingPasteboard)
+        guard !urls.isEmpty else { return false }
+
+        Task { @MainActor in
+            let coordinator = IslandCoordinator.shared
+            coordinator.fileShelfService.isDropTargetActive = false
+            coordinator.fileShelfService.addFiles(urls)
+            coordinator.expandTo(tab: .shelf)
+        }
+        return true
+    }
+
     override func hitTest(_ point: NSPoint) -> NSView? {
         // Convert window coordinate point to view local coordinate space (where isFlipped == true, y=0 is at the top)
         let localPoint = convert(point, from: nil)

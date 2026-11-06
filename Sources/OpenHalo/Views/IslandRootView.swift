@@ -71,7 +71,7 @@ public struct IslandRootView: View {
             .onHover { hovering in
                 coordinator.setHovering(hovering)
             }
-            .onDrop(of: [UTType.fileURL.identifier, UTType.item.identifier], isTargeted: $isDropTargeted) { providers in
+            .onDrop(of: [.fileURL, .item, .data], isTargeted: $isDropTargeted) { providers in
                 handleDroppedProviders(providers)
             }
 
@@ -102,24 +102,8 @@ public struct IslandRootView: View {
     }
 
     private func handleDroppedProviders(_ providers: [NSItemProvider]) -> Bool {
-        var urls: [URL] = []
-        let group = DispatchGroup()
-
-        for provider in providers {
-            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-                group.enter()
-                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                    defer { group.leave() }
-                    if let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        urls.append(url)
-                    } else if let url = item as? URL {
-                        urls.append(url)
-                    }
-                }
-            }
-        }
-
-        group.notify(queue: .main) {
+        Task { @MainActor in
+            let urls = await FileDropResolver.resolveURLs(from: providers)
             if !urls.isEmpty {
                 coordinator.fileShelfService.addFiles(urls)
                 coordinator.expandTo(tab: .shelf)
