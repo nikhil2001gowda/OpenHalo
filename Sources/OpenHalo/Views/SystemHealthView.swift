@@ -8,6 +8,8 @@ public struct SystemHealthView: View {
 
     @State private var copiedUUID = false
     @State private var formattedJSON = false
+    @State private var isDraggingBrightness = false
+    @State private var dragBrightnessFraction: Double = 0.5
 
     @MainActor
     public init(
@@ -68,6 +70,9 @@ public struct SystemHealthView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
+        .onAppear {
+            systemControls.syncHardwareBrightness(isUserAction: false)
+        }
     }
 
     // MARK: - Modern Sequoia Activity-Ring Metric Card
@@ -139,16 +144,23 @@ public struct SystemHealthView: View {
 
     // MARK: - Display Brightness Capsule Slider
 
+    private var currentEffectiveBrightness: Double {
+        if isDraggingBrightness {
+            return dragBrightnessFraction
+        } else {
+            return min(max(Double(systemControls.brightness), 0.0), 1.0)
+        }
+    }
+
     private var brightnessCapsuleSlider: some View {
         HStack(spacing: 9) {
             Image(systemName: "sun.min.fill")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.5 + Double(systemControls.brightness) * 0.4))
+                .foregroundColor(Color.white.opacity(0.5 + currentEffectiveBrightness * 0.4))
 
             GeometryReader { geo in
                 let width = geo.size.width
-                let clamped = min(max(Double(systemControls.brightness), 0.0), 1.0)
-                let filledWidth = max(14, width * CGFloat(clamped))
+                let filledWidth = width > 20 ? max(14, width * CGFloat(currentEffectiveBrightness)) : 14
 
                 ZStack(alignment: .leading) {
                     // Track
@@ -173,11 +185,22 @@ public struct SystemHealthView: View {
                 .frame(height: 12)
                 .contentShape(Rectangle())
                 .gesture(
-                    DragGesture(minimumDistance: 0)
+                    DragGesture(minimumDistance: 1)
                         .onChanged { gesture in
-                            let fraction = Double(gesture.location.x / width)
-                            let newB = min(max(fraction, 0.0), 1.0)
-                            systemControls.setBrightness(Float(newB))
+                            guard width > 20 else { return }
+                            isDraggingBrightness = true
+                            let fraction = min(max(Double(gesture.location.x / width), 0.0), 1.0)
+                            dragBrightnessFraction = fraction
+                            systemControls.setBrightness(Float(fraction))
+                        }
+                        .onEnded { gesture in
+                            guard width > 20 else { return }
+                            let fraction = min(max(Double(gesture.location.x / width), 0.0), 1.0)
+                            dragBrightnessFraction = fraction
+                            systemControls.commitFinalBrightness(Float(fraction))
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                isDraggingBrightness = false
+                            }
                         }
                 )
             }

@@ -278,9 +278,10 @@ public final class IslandCoordinator: ObservableObject {
         }
         IslandWindowController.shared.panel?.orderFrontRegardless()
 
-        // Start hardware polling when expanded on system tab
+        // Start hardware polling and sync brightness when expanded on system tab
         if tab == .system {
             hardwareMonitor.startPolling()
+            systemControls.syncHardwareBrightness(isUserAction: false)
         } else {
             hardwareMonitor.stopPolling()
         }

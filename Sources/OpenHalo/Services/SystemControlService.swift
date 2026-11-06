@@ -44,12 +44,17 @@ public final class SystemControlService: ObservableObject {
 
     private func setupDisplayServices() {
         if let handle = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_NOW) {
-            // Prefer user-perceived DisplayServicesGetBrightness/SetBrightness (exact match with macOS Control Center & F1/F2 keys)
-            if let getSym = dlsym(handle, "DisplayServicesGetBrightness") ?? dlsym(handle, "DisplayServicesGetLinearBrightness") {
+            // Strictly prefer user-perceived DisplayServicesGetBrightness/SetBrightness (exact match with macOS Control Center & F1/F2 keys)
+            if let getSym = dlsym(handle, "DisplayServicesGetBrightness") {
                 getBrightnessPointer = unsafeBitCast(getSym, to: GetBrightnessFunc.self)
+            } else if let getLinearSym = dlsym(handle, "DisplayServicesGetLinearBrightness") {
+                getBrightnessPointer = unsafeBitCast(getLinearSym, to: GetBrightnessFunc.self)
             }
-            if let setSym = dlsym(handle, "DisplayServicesSetBrightness") ?? dlsym(handle, "DisplayServicesSetLinearBrightness") {
+
+            if let setSym = dlsym(handle, "DisplayServicesSetBrightness") {
                 setBrightnessPointer = unsafeBitCast(setSym, to: SetBrightnessFunc.self)
+            } else if let setLinearSym = dlsym(handle, "DisplayServicesSetLinearBrightness") {
+                setBrightnessPointer = unsafeBitCast(setLinearSym, to: SetBrightnessFunc.self)
             }
         }
     }
@@ -87,7 +92,7 @@ public final class SystemControlService: ObservableObject {
         let keyCode = Int((data & 0xFFFF0000) >> 16)
         let keyFlags = data & 0x0000FFFF
         let keyState = (keyFlags & 0xFF00) >> 8
-        let _ = (keyState == 0xA) // Key down event
+        guard keyState == 0xA else { return } // Key down event only
 
         // 2: NX_KEYTYPE_BRIGHTNESS_DOWN, 3: NX_KEYTYPE_BRIGHTNESS_UP
         if keyCode == 2 || keyCode == 3 {
@@ -95,7 +100,7 @@ public final class SystemControlService: ObservableObject {
                 guard let self = self else { return }
                 self.lastUserAdjustmentDate = Date()
                 // Fetch latest brightness after macOS updates DisplayServices
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     self.syncHardwareBrightness(isUserAction: true)
                 }
             }
@@ -114,10 +119,9 @@ public final class SystemControlService: ObservableObject {
             }
 
             // CRITICAL: ONLY notify onBrightnessChanged (which displays the HUD toggle in Island)
-            // if this change was triggered by an explicit user action (e.g. F1/F2 key, or within 1.5s of user adjustment).
+            // if this change was triggered by an explicit user action (e.g. F1/F2 key, or manual slider drag).
             // Silent system True Tone / ambient light sensor adaptations are updated silently without popping up the Island!
-            let isRecentUserAction = isUserAction || (Date().timeIntervalSince(lastUserAdjustmentDate) < 1.5)
-            if isRecentUserAction && hasChanged {
+            if isUserAction && hasChanged {
                 self.onBrightnessChanged?(clamped)
             }
         }
@@ -151,15 +155,34 @@ public final class SystemControlService: ObservableObject {
         self.brightness = 0.5
     }
 
+    private var lastSetBrightnessDate: Date = .distantPast
+
     public func setBrightness(_ newBrightness: Float) {
         lastUserAdjustmentDate = Date()
         let clamped = max(0.0, min(1.0, newBrightness))
         self.brightness = clamped
 
+        // Throttle hardware writes to avoid clogging the DisplayServices IPC queue
+        let now = Date()
+        if now.timeIntervalSince(lastSetBrightnessDate) >= 0.03 {
+            lastSetBrightnessDate = now
+            if let fn = setBrightnessPointer {
+                _ = fn(CGMainDisplayID(), clamped)
+            }
+        }
+
+        self.onBrightnessChanged?(clamped)
+    }
+
+    /// Flushes an exact hardware brightness setting on completion of a user drag session
+    public func commitFinalBrightness(_ finalBrightness: Float) {
+        lastUserAdjustmentDate = Date()
+        let clamped = max(0.0, min(1.0, finalBrightness))
+        self.brightness = clamped
+        lastSetBrightnessDate = Date()
         if let fn = setBrightnessPointer {
             _ = fn(CGMainDisplayID(), clamped)
         }
-
         self.onBrightnessChanged?(clamped)
     }
 
