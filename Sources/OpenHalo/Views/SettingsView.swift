@@ -724,7 +724,7 @@ public struct SettingsView: View {
         VStack(spacing: 16) {
             // Anti-Spoofing Liveness
             SettingsGroup(title: "Anti-Spoofing & Liveness Detection") {
-                VStack(spacing: 12) {
+                VStack(spacing: 0) {
                     SettingsRow(
                         title: "Liveness Verification",
                         subtitle: "Detects 3D facial depth, natural micro-movements, and screens/photos",
@@ -740,7 +740,7 @@ public struct SettingsView: View {
                     }
 
                     Divider()
-                        .padding(.leading, 42)
+                        .padding(.leading, 52)
 
                     SettingsRow(
                         title: "Liveness Strictness Mode",
@@ -756,19 +756,19 @@ public struct SettingsView: View {
                             Text("Heavy (Strict)").tag(LivenessMode.heavy)
                         }
                         .pickerStyle(.segmented)
-                        .frame(width: 170)
+                        .frame(width: 230)
                     }
                 }
             }
 
             // Facial Match & Distance Sliders
             SettingsGroup(title: "Recognition Parameters") {
-                VStack(spacing: 16) {
-                    // Match Sensitivity
+                VStack(spacing: 0) {
+                    // Match Similarity Threshold
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text("Match Similarity Threshold")
-                                .font(.system(size: 11.5, weight: .semibold))
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white)
                             Spacer()
                             Text("\(Int(glanceSettings.matchThreshold * 100))% (Cosine Cutoff)")
@@ -794,16 +794,19 @@ public struct SettingsView: View {
                             Text("Strict Security")
                         }
                         .font(.system(size: 9.5))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Color.white.opacity(0.5))
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
 
                     Divider()
+                        .padding(.horizontal, 14)
 
                     // Face Distance Prominence
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text("Face Distance Prominence")
-                                .font(.system(size: 11.5, weight: .semibold))
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white)
                             Spacer()
                             Text("\(Int(glanceSettings.minimumFaceWidth * 100))% Width")
@@ -829,62 +832,78 @@ public struct SettingsView: View {
                             Text("Near Distance Only (1 ft)")
                         }
                         .font(.system(size: 9.5))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Color.white.opacity(0.5))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+
+                    Divider()
+                        .padding(.horizontal, 14)
+
+                    // Scan Window Timeout
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Scan Window Timeout")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white)
+                            Spacer()
+                            Text("\(glanceSettings.faceDetectionSeconds)s")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.cyan)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.cyan.opacity(0.12))
+                                .cornerRadius(4)
+                        }
+
+                        Slider(
+                            value: Binding(
+                                get: { Double(glanceSettings.faceDetectionSeconds) },
+                                set: { glanceSettings.faceDetectionSeconds = Int($0) }
+                            ),
+                            in: 3...10,
+                            step: 1
+                        )
+
+                        HStack {
+                            Text("3 seconds (Fastest)")
+                            Spacer()
+                            Text("10 seconds (Thorough)")
+                        }
+                        .font(.system(size: 9.5))
+                        .foregroundColor(Color.white.opacity(0.5))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+
+                    Divider()
+                        .padding(.horizontal, 14)
+
+                    // Auto-Retry on Miss
+                    SettingsRow(
+                        title: "Auto-Retry Once on Miss",
+                        subtitle: "Attempts a second rapid scan if the first pass does not find a match",
+                        icon: "arrow.triangle.2.circlepath",
+                        iconColor: .teal
+                    ) {
+                        Toggle("", isOn: Binding(
+                            get: { glanceSettings.autoRetryOnce },
+                            set: { glanceSettings.autoRetryOnce = $0 }
+                        ))
+                        .toggleStyle(.switch)
+                        .labelsHidden()
                     }
 
                     Divider()
-
-                    // Scan Window & Auto-Retry
-                    HStack(spacing: 20) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text("Scan Window Timeout")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.white)
-                                Spacer()
-                                Text("\(glanceSettings.faceDetectionSeconds)s")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.cyan)
-                            }
-                            Slider(
-                                value: Binding(
-                                    get: { Double(glanceSettings.faceDetectionSeconds) },
-                                    set: { glanceSettings.faceDetectionSeconds = Int($0) }
-                                ),
-                                in: 3...10,
-                                step: 1
-                            )
-                        }
-
-                        SettingsRow(
-                            title: "Auto-Retry Once on Miss",
-                            subtitle: nil,
-                            icon: nil
-                        ) {
-                            Toggle("", isOn: Binding(
-                                get: { glanceSettings.autoRetryOnce },
-                                set: { glanceSettings.autoRetryOnce = $0 }
-                            ))
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                        }
-                    }
-
-                    Divider()
+                        .padding(.leading, 52)
 
                     // Auto-Lock Keychain Session
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Auto-Lock Keychain Session")
-                                .font(.system(size: 11.5, weight: .semibold))
-                                .foregroundColor(.white)
-                            Text("Wipes in-memory decrypted session credentials after idle timeout")
-                                .font(.system(size: 9.5))
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer()
-
+                    SettingsRow(
+                        title: "Auto-Lock Keychain Session",
+                        subtitle: "Wipes in-memory decrypted session credentials after idle timeout",
+                        icon: "lock.shield",
+                        iconColor: .orange
+                    ) {
                         Picker("", selection: Binding(
                             get: { glanceSettings.autoLockInterval },
                             set: { glanceSettings.autoLockInterval = $0 }
@@ -897,7 +916,6 @@ public struct SettingsView: View {
                         .frame(width: 130)
                     }
                 }
-                .padding(12)
             }
 
             // Reset Defaults Button
@@ -1137,7 +1155,7 @@ struct SettingsGroup<Content: View>: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 11.5, weight: .semibold))
-                .foregroundColor(.secondary)
+                .foregroundColor(Color.white.opacity(0.6))
                 .padding(.horizontal, 4)
 
             VStack(spacing: 0) {
@@ -1145,11 +1163,11 @@ struct SettingsGroup<Content: View>: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+                    .fill(Color.white.opacity(0.045))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
+                    .strokeBorder(Color.white.opacity(0.09), lineWidth: 0.8)
             )
         }
     }
@@ -1185,17 +1203,17 @@ struct SettingsRow<Content: View>: View {
                 if let subtitle {
                     Text(subtitle)
                         .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Color.white.opacity(0.55))
                         .lineLimit(2)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 16)
 
             content()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 }
 
