@@ -140,6 +140,27 @@ public struct SystemHealthView: View {
                 .pointingHandCursor()
                 .help("Format JSON on clipboard")
 
+                // Settings Quick Access
+                Button(action: {
+                    SettingsWindowManager.shared.show()
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 9))
+                        Text("Settings")
+                            .font(.system(size: 9.5, weight: .medium))
+                    }
+                    .foregroundColor(Color.white.opacity(0.85))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3.5)
+                    .background(Color.white.opacity(0.12))
+                    .cornerRadius(6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
+                .help("Open OpenHalo Preferences (⌘,)")
+
                 Spacer()
             }
             .padding(.horizontal, 4)

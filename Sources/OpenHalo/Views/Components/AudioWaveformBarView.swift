@@ -13,23 +13,27 @@ public struct AudioWaveformBarView: View {
     }
 
     public var body: some View {
-        HStack(spacing: 2.5) {
-            ForEach(0..<4, id: \.self) { index in
-                Capsule()
-                    .fill(color)
-                    .frame(width: 2.8, height: isPlaying ? max(barHeights[index] * 13, 3.5) : 3.5)
+        if isPlaying {
+            HStack(spacing: 2.5) {
+                ForEach(0..<4, id: \.self) { index in
+                    Capsule()
+                        .fill(color)
+                        .frame(width: 2.8, height: max(barHeights[index] * 13, 3.5))
+                }
             }
-        }
-        .frame(height: 14)
-        .onAppear {
-            updateAnimationState()
-        }
-        .onChange(of: isPlaying) {
-            updateAnimationState()
-        }
-        .onDisappear {
-            timer?.invalidate()
-            timer = nil
+            .frame(height: 14)
+            .onAppear {
+                updateAnimationState()
+            }
+            .onChange(of: isPlaying) {
+                updateAnimationState()
+            }
+            .onDisappear {
+                timer?.invalidate()
+                timer = nil
+            }
+        } else {
+            EmptyView()
         }
     }
 

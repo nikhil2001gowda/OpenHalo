@@ -208,22 +208,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openPreferences() {
-        if settingsWindow == nil {
-            let hosting = NSHostingView(rootView: SettingsView())
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 460, height: 530),
-                styleMask: [.titled, .closable],
-                backing: .buffered,
-                defer: false
-            )
-            window.title = "OpenHalo Preferences"
-            window.contentView = hosting
-            window.center()
-            window.isReleasedWhenClosed = false
-            self.settingsWindow = window
+        Task { @MainActor in
+            SettingsWindowManager.shared.show()
         }
-        NSApp.activate(ignoringOtherApps: true)
-        settingsWindow?.makeKeyAndOrderFront(nil)
     }
 
     @objc private func quitApp() {

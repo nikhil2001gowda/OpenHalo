@@ -22,6 +22,22 @@ public struct ExpandedCardView: View {
 
                 Spacer()
 
+                // Settings Button
+                Button(action: {
+                    SettingsWindowManager.shared.show()
+                }) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(Color.white.opacity(0.75))
+                        .frame(width: 22, height: 22)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
+                .help("Settings (⌘,)")
+
                 // Collapse Button
                 Button(action: {
                     coordinator.collapseToCompact()
@@ -36,6 +52,7 @@ public struct ExpandedCardView: View {
                 }
                 .buttonStyle(.plain)
                 .pointingHandCursor()
+                .help("Collapse Island")
             }
             .padding(.horizontal, 12)
             .padding(.top, ScreenNotchDetector.detect().hasNotch ? 40 : 10)

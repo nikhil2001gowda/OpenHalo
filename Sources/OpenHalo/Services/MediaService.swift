@@ -12,6 +12,7 @@ public final class MediaService: ObservableObject {
     private var progressTimer: Timer?
     private var pollTimer: Timer?
     private var outputAudioDeviceID: AudioDeviceID = 0
+    private var pausedSince: Date? = nil
 
     public nonisolated static func isAppRunning(bundleID: String) -> Bool {
         return !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
@@ -373,7 +374,7 @@ public final class MediaService: ObservableObject {
                     """
 
                     if let output = await AppleScriptRunner.run(script), output != "none" {
-                        await self.parseBrowserMedia(output: output, browserName: config.appName, isAudible: true)
+                        await self.parseBrowserMedia(output: output, browserName: config.appName, isAudible: isSystemAudioActive)
                         return
                     }
                 }
@@ -392,13 +393,14 @@ public final class MediaService: ObservableObject {
                 if let output = await AppleScriptRunner.run(script), output != "none" {
                     let parts = output.components(separatedBy: "|")
                     let docName = parts.count > 1 ? parts[1] : "Video"
-                    await self.setGenericPlayingTrack(title: docName, artist: "QuickTime Player", source: .quickTime)
+                    await self.setGenericPlayingTrack(title: docName, artist: "QuickTime Player", source: .quickTime, isPlaying: isSystemAudioActive)
                     return
                 }
             }
 
             // 5. If no active media stream was detected in any player/browser, clear media state so Island returns to notch width
             await MainActor.run {
+                self.pausedSince = nil
                 if self.currentTrack.source != .appleMusic && self.currentTrack.source != .spotify {
                     if !self.currentTrack.title.isEmpty {
                         self.currentTrack = MediaTrack()
@@ -407,6 +409,7 @@ public final class MediaService: ObservableObject {
                     }
                 } else if self.currentTrack.playbackState == .playing && !isSystemAudioActive {
                     self.currentTrack.playbackState = .paused
+                    self.isAvailable = false
                     self.updateProgressTimer()
                 }
             }
@@ -446,30 +449,47 @@ public final class MediaService: ObservableObject {
             artist = "Twitch"
         }
 
+        let isPlaying = isAudible
+
+        if !isPlaying {
+            if pausedSince == nil {
+                pausedSince = Date()
+            }
+            // If paused for more than 40 seconds, clear the track so it doesn't linger
+            if let pausedAt = pausedSince, Date().timeIntervalSince(pausedAt) > 40 {
+                self.currentTrack = MediaTrack()
+                self.isAvailable = false
+                self.updateProgressTimer()
+                return
+            }
+        } else {
+            pausedSince = nil
+        }
+
         self.currentTrack = MediaTrack(
             title: rawTitle.isEmpty ? "Media Playing" : rawTitle,
             artist: artist,
             album: "",
             duration: 0,
             position: 0,
-            playbackState: .playing,
+            playbackState: isPlaying ? .playing : .paused,
             source: source
         )
-        self.isAvailable = true
+        self.isAvailable = isPlaying
         self.updateProgressTimer()
     }
 
-    private func setGenericPlayingTrack(title: String, artist: String, source: MusicSource) {
+    private func setGenericPlayingTrack(title: String, artist: String, source: MusicSource, isPlaying: Bool = true) {
         self.currentTrack = MediaTrack(
             title: title,
             artist: artist,
             album: "",
             duration: 0,
             position: 0,
-            playbackState: .playing,
+            playbackState: isPlaying ? .playing : .paused,
             source: source
         )
-        self.isAvailable = true
+        self.isAvailable = isPlaying
         self.updateProgressTimer()
     }
 
@@ -483,6 +503,20 @@ public final class MediaService: ObservableObject {
             let artist = parts[3]
             let duration = Double(parts[4]) ?? 0
             let position = Double(parts[5]) ?? 0
+
+            if !isPlaying {
+                if pausedSince == nil {
+                    pausedSince = Date()
+                }
+                if let pausedAt = pausedSince, Date().timeIntervalSince(pausedAt) > 40 {
+                    self.currentTrack = MediaTrack()
+                    self.isAvailable = false
+                    self.updateProgressTimer()
+                    return
+                }
+            } else {
+                pausedSince = nil
+            }
 
             self.currentTrack = MediaTrack(
                 title: title,
