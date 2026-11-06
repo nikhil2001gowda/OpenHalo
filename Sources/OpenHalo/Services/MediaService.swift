@@ -284,6 +284,33 @@ public final class MediaService: ObservableObject {
         }
     }
 
+    public func openSourceApp() {
+        switch currentTrack.source {
+        case .appleMusic:
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Music") {
+                NSWorkspace.shared.open(url)
+            } else {
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Music.app"))
+            }
+        case .spotify:
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.spotify.client") {
+                NSWorkspace.shared.open(url)
+            }
+        case .chrome:
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.Chrome") {
+                NSWorkspace.shared.open(url)
+            }
+        case .safari:
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Safari") {
+                NSWorkspace.shared.open(url)
+            }
+        default:
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Music") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+
     private func sendSystemMediaKey(key: Int32) {
         let downFlags = NSEvent.ModifierFlags(rawValue: 0xa00)
         let upFlags = NSEvent.ModifierFlags(rawValue: 0xb00)

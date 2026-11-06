@@ -21,19 +21,26 @@ public struct MediaExpandedView: View {
             // Track Info & Artwork
             HStack(spacing: 14) {
                 // Artwork or App Icon
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color(red: 0.16, green: 0.16, blue: 0.18))
-                        .frame(width: 46, height: 46)
+                Button(action: {
+                    mediaService.openSourceApp()
+                }) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(red: 0.16, green: 0.16, blue: 0.18))
+                            .frame(width: 46, height: 46)
 
-                    Image(systemName: isTrackActive ? mediaService.currentTrack.source.iconName : "music.note")
-                        .font(.system(size: 22))
-                        .foregroundColor(sourceColor(mediaService.currentTrack.source))
+                        Image(systemName: isTrackActive ? mediaService.currentTrack.source.iconName : "music.note")
+                            .font(.system(size: 22))
+                            .foregroundColor(sourceColor(mediaService.currentTrack.source))
+                    }
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                    )
                 }
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
-                )
+                .buttonStyle(.plain)
+                .pointingHandCursor()
+                .help(isTrackActive ? "Open \(mediaService.currentTrack.source.rawValue)" : "Open Music")
 
                 // Title & Artist
                 VStack(alignment: .leading, spacing: 2) {
