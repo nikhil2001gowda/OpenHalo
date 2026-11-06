@@ -119,13 +119,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusBarItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "circle.circle", accessibilityDescription: "OpenHalo")
+            button.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "OpenHalo")
             button.toolTip = "OpenHalo — Dynamic Island & Face ID"
         }
 
         let menu = NSMenu()
 
-        let prefItem = NSMenuItem(title: "OpenHalo Preferences & Face ID...", action: #selector(openPreferences), keyEquivalent: ",")
+        let prefItem = NSMenuItem(title: "OpenHalo Settings & Face ID...", action: #selector(openPreferences), keyEquivalent: ",")
         menu.addItem(prefItem)
 
         let toggleItem = NSMenuItem(title: "Toggle Dynamic Island", action: #selector(toggleIsland), keyEquivalent: "i")
@@ -155,7 +155,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let launcherItem = NSMenuItem(title: "App & Bookmark Launcher", action: #selector(showLauncherTab), keyEquivalent: "6")
         menu.addItem(launcherItem)
 
-        let systemItem = NSMenuItem(title: "System Health & Brightness", action: #selector(showSystemTab), keyEquivalent: "7")
+        let systemItem = NSMenuItem(title: "System Health & Battery Telemetry", action: #selector(showSystemTab), keyEquivalent: "7")
         menu.addItem(systemItem)
 
         let shelfItem = NSMenuItem(title: "File Shelf & AirDrop", action: #selector(showShelfTab), keyEquivalent: "8")
@@ -163,11 +163,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let mirrorItem = NSMenuItem(title: "Quick Camera Mirror & Vision", action: #selector(showMirrorTab), keyEquivalent: "9")
         menu.addItem(mirrorItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        let settingsItem = NSMenuItem(title: "Preferences...", action: #selector(openPreferences), keyEquivalent: ",")
-        menu.addItem(settingsItem)
 
         menu.addItem(NSMenuItem.separator())
 
