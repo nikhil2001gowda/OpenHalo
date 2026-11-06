@@ -597,25 +597,10 @@ public struct SettingsView: View {
                             }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "sparkles")
-                                    Text("Test Notch")
+                                    Text("Test Notch Animation")
                                 }
                             }
                             .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-
-                            Button(action: {
-                                coordinator.showFaceIDScan(isScanning: true, isUnlocked: false)
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                                    SoundEffectManager.playActionBeep()
-                                    coordinator.showFaceIDScan(isScanning: false, isUnlocked: true)
-                                }
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "faceid")
-                                    Text("Test HUD")
-                                }
-                            }
-                            .buttonStyle(.bordered)
                             .controlSize(.small)
                         }
                     }
