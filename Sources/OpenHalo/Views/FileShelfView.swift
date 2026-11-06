@@ -36,31 +36,104 @@ public struct FileShelfView: View {
                 }
 
                 if !fileShelfService.items.isEmpty {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 5) {
+                        // Zip All
+                        Button(action: {
+                            Task { await fileShelfService.zipAllItems() }
+                        }) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "doc.zipper")
+                                    .font(.system(size: 9.5, weight: .bold))
+                                Text("Zip All")
+                                    .font(.system(size: 9.5, weight: .medium))
+                            }
+                            .foregroundColor(.orange)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color.orange.opacity(0.15))
+                            .cornerRadius(5)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Create a ZIP archive from all staged files")
+
+                        // Convert All Images Menu (if images present)
+                        if fileShelfService.hasImages {
+                            Menu {
+                                Button("Convert all to PNG") {
+                                    Task { await fileShelfService.convertAllImages(to: .png) }
+                                }
+                                Button("Convert all to JPEG") {
+                                    Task { await fileShelfService.convertAllImages(to: .jpeg) }
+                                }
+                                Button("Convert all to WebP") {
+                                    Task { await fileShelfService.convertAllImages(to: .webp) }
+                                }
+                                Button("Convert all to HEIC") {
+                                    Task { await fileShelfService.convertAllImages(to: .heic) }
+                                }
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                        .font(.system(size: 9, weight: .bold))
+                                    Text("Convert")
+                                        .font(.system(size: 9.5, weight: .medium))
+                                }
+                                .foregroundColor(.purple)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.purple.opacity(0.15))
+                                .cornerRadius(5)
+                            }
+                            .menuStyle(.borderlessButton)
+                            .help("Convert all images in shelf")
+                        }
+
+                        // Combine into PDF (if mergeable items present)
+                        if fileShelfService.hasPDFMergeableItems {
+                            Button(action: {
+                                Task { await fileShelfService.mergeAllImagesToPDF() }
+                            }) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "doc.on.doc")
+                                        .font(.system(size: 9, weight: .bold))
+                                    Text("Make PDF")
+                                        .font(.system(size: 9.5, weight: .medium))
+                                }
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.green.opacity(0.15))
+                                .cornerRadius(5)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Merge images and documents into a single PDF")
+                        }
+
                         // AirDrop All
                         Button(action: { fileShelfService.airDropAll() }) {
-                            HStack(spacing: 4) {
+                            HStack(spacing: 3) {
                                 Image(systemName: "airdrop")
-                                    .font(.system(size: 10, weight: .bold))
-                                Text("AirDrop All")
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(.system(size: 9.5, weight: .bold))
+                                Text("AirDrop")
+                                    .font(.system(size: 9.5, weight: .medium))
                             }
                             .foregroundColor(.cyan)
-                            .padding(.horizontal, 8)
+                            .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .background(Color.cyan.opacity(0.15))
-                            .cornerRadius(6)
+                            .cornerRadius(5)
                         }
                         .buttonStyle(.plain)
 
+                        // Clear All
                         Button(action: { fileShelfService.clearAll() }) {
                             Text("Clear")
-                                .font(.system(size: 10, weight: .medium))
+                                .font(.system(size: 9.5, weight: .medium))
                                 .foregroundColor(Color.white.opacity(0.6))
-                                .padding(.horizontal, 8)
+                                .padding(.horizontal, 6)
                                 .padding(.vertical, 3)
-                                .background(Color.white.opacity(0.12))
-                                .cornerRadius(6)
+                                .background(Color.white.opacity(0.10))
+                                .cornerRadius(5)
                         }
                         .buttonStyle(.plain)
                     }
@@ -175,6 +248,14 @@ public struct FileShelfView: View {
         .contextMenu {
             Button("AirDrop File") {
                 fileShelfService.airDropItem(item)
+            }
+            Button("Create ZIP Archive") {
+                Task { await fileShelfService.zipItem(item) }
+            }
+            if isImageFile(item.url) || item.url.pathExtension.lowercased() == "pdf" {
+                Button("Convert to PDF") {
+                    Task { await fileShelfService.mergeAllImagesToPDF() }
+                }
             }
             Button("Open File") {
                 fileShelfService.openFile(item)

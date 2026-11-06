@@ -124,4 +124,92 @@ public final class FileShelfService: ObservableObject {
             }
         }
     }
+
+    public var hasImages: Bool {
+        items.contains { isImageFile($0.url) }
+    }
+
+    public var hasPDFMergeableItems: Bool {
+        items.contains { isImageFile($0.url) || $0.url.pathExtension.lowercased() == "pdf" }
+    }
+
+    public func isImageFile(_ url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        return ["png", "jpg", "jpeg", "webp", "heic", "tiff", "gif", "bmp"].contains(ext)
+    }
+
+    // MARK: - ZIP Archiving
+
+    public func zipAllItems() async {
+        guard !items.isEmpty else { return }
+        do {
+            conversionStatusMessage = "Creating ZIP archive..."
+            let zipURL = try await ZipArchiveService.shared.createZip(from: items.map { $0.url })
+            addFiles([zipURL])
+            conversionStatusMessage = "Created \(zipURL.lastPathComponent)"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+                self?.conversionStatusMessage = nil
+            }
+        } catch {
+            conversionStatusMessage = "Zip failed: \(error.localizedDescription)"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.conversionStatusMessage = nil
+            }
+        }
+    }
+
+    public func zipItem(_ item: ShelfItem) async {
+        do {
+            conversionStatusMessage = "Zipping \(item.name)..."
+            let zipURL = try await ZipArchiveService.shared.createZip(from: [item.url])
+            addFiles([zipURL])
+            conversionStatusMessage = "Created \(zipURL.lastPathComponent)"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+                self?.conversionStatusMessage = nil
+            }
+        } catch {
+            conversionStatusMessage = "Zip failed: \(error.localizedDescription)"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.conversionStatusMessage = nil
+            }
+        }
+    }
+
+    // MARK: - PDF Merging
+
+    public func mergeAllImagesToPDF() async {
+        let mergeable = items.filter { isImageFile($0.url) || $0.url.pathExtension.lowercased() == "pdf" }
+        guard !mergeable.isEmpty else { return }
+        do {
+            conversionStatusMessage = "Combining \(mergeable.count) items into PDF..."
+            let pdfURL = try await PDFMergeService.shared.combineToPDF(urls: mergeable.map { $0.url })
+            addFiles([pdfURL])
+            conversionStatusMessage = "Created PDF: \(pdfURL.lastPathComponent)"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+                self?.conversionStatusMessage = nil
+            }
+        } catch {
+            conversionStatusMessage = "PDF merge failed: \(error.localizedDescription)"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.conversionStatusMessage = nil
+            }
+        }
+    }
+
+    public func convertAllImages(to format: SIPSImageFormat) async {
+        let images = items.filter { isImageFile($0.url) }
+        guard !images.isEmpty else { return }
+        conversionStatusMessage = "Converting \(images.count) images to \(format.displayName)..."
+        var convertedCount = 0
+        for item in images {
+            if let targetURL = try? await SIPSConversionService.shared.convert(inputURL: item.url, to: format) {
+                addFiles([targetURL])
+                convertedCount += 1
+            }
+        }
+        conversionStatusMessage = "Converted \(convertedCount) images to \(format.displayName)"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            self?.conversionStatusMessage = nil
+        }
+    }
 }

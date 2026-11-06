@@ -161,28 +161,14 @@ public final class SystemControlService: ObservableObject {
         lastUserAdjustmentDate = Date()
         let clamped = max(0.0, min(1.0, newBrightness))
         self.brightness = clamped
-
-        // Throttle hardware writes to avoid clogging the DisplayServices IPC queue
-        let now = Date()
-        if now.timeIntervalSince(lastSetBrightnessDate) >= 0.03 {
-            lastSetBrightnessDate = now
-            if let fn = setBrightnessPointer {
-                _ = fn(CGMainDisplayID(), clamped)
-            }
-        }
-
         self.onBrightnessChanged?(clamped)
     }
 
-    /// Flushes an exact hardware brightness setting on completion of a user drag session
+    /// Flushes an exact brightness setting on completion of a user drag session
     public func commitFinalBrightness(_ finalBrightness: Float) {
         lastUserAdjustmentDate = Date()
         let clamped = max(0.0, min(1.0, finalBrightness))
         self.brightness = clamped
-        lastSetBrightnessDate = Date()
-        if let fn = setBrightnessPointer {
-            _ = fn(CGMainDisplayID(), clamped)
-        }
         self.onBrightnessChanged?(clamped)
     }
 
