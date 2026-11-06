@@ -5,8 +5,21 @@ public struct ExpandedCardView: View {
 
     public init() {}
 
+    private var hasNotch: Bool {
+        ScreenNotchDetector.detect().hasNotch
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
+            if hasNotch {
+                // Subtle notch drop-down grabber accent right below the hardware camera housing
+                Capsule()
+                    .fill(Color.white.opacity(0.18))
+                    .frame(width: 32, height: 3.5)
+                    .padding(.top, 36)
+                    .padding(.bottom, 2)
+            }
+
             // Adaptive Header Tab Strip (10 Feature Tabs)
             HStack(spacing: 4) {
                 tabButton(.media, title: "Media", icon: "music.note")
@@ -55,7 +68,7 @@ public struct ExpandedCardView: View {
                 .help("Collapse Island")
             }
             .padding(.horizontal, 12)
-            .padding(.top, ScreenNotchDetector.detect().hasNotch ? 40 : 10)
+            .padding(.top, hasNotch ? 4 : 10)
             .padding(.bottom, 4)
 
             Divider()

@@ -27,16 +27,29 @@ public struct IslandRootView: View {
         VStack(spacing: 0) {
             ZStack(alignment: .top) {
                 // Background Capsule (100% Optical Pure Black #000000 to match notch glass)
-                RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
-                    .fill(Color.black)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
-                            .strokeBorder(
-                                isDropTargeted ? Color.cyan : (shouldShowBorder ? Color.white.opacity(0.12) : Color.clear),
-                                lineWidth: isDropTargeted ? 1.5 : (shouldShowBorder ? 0.8 : 0)
-                            )
-                    )
-                    .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.7 : 0), radius: 18, x: 0, y: 8)
+                if hasNotch {
+                    AtollBottomRoundedRectangle(radius: currentCornerRadius)
+                        .fill(Color.black)
+                        .overlay(
+                            AtollBottomRoundedRectangle(radius: currentCornerRadius)
+                                .strokeBorder(
+                                    isDropTargeted ? Color.cyan : (shouldShowBorder ? Color.white.opacity(0.12) : Color.clear),
+                                    lineWidth: isDropTargeted ? 1.5 : (shouldShowBorder ? 0.8 : 0)
+                                )
+                        )
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.7 : 0), radius: 18, x: 0, y: 8)
+                } else {
+                    RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
+                        .fill(Color.black)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: currentCornerRadius, style: .continuous)
+                                .strokeBorder(
+                                    isDropTargeted ? Color.cyan : (shouldShowBorder ? Color.white.opacity(0.12) : Color.clear),
+                                    lineWidth: isDropTargeted ? 1.5 : (shouldShowBorder ? 0.8 : 0)
+                                )
+                        )
+                        .shadow(color: Color.black.opacity(coordinator.state.isExpanded ? 0.7 : 0), radius: 18, x: 0, y: 8)
+                }
 
                 // Foreground Content
                 VStack(spacing: 0) {
